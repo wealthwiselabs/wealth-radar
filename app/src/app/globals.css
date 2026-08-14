@@ -1,0 +1,367 @@
+@import 'tailwindcss';
+
+/* Design system CSS Variables */
+:root {
+  /* Typography — Inter for body/UI, Space Grotesk (display) for headings.
+     Both are self-hosted via next/font (see layout.tsx); the --font-* vars
+     are supplied there. --font-stack-matter keeps its name so components
+     don't change; only the underlying face does. */
+  --font-stack-inter: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-stack-matter: var(--font-display), var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Origin Spacing Scale (rem based, 1rem = 14px in Origin) */
+  --space-1: 0.286rem;   /* 4px */
+  --space-2: 0.571rem;   /* 8px */
+  --space-3: 0.857rem;   /* 12px */
+  --space-4: 1.143rem;   /* 16px */
+  --space-5: 1.429rem;   /* 20px */
+  --space-6: 1.714rem;   /* 24px */
+  --space-8: 2.286rem;   /* 32px */
+  --space-10: 2.857rem;  /* 40px */
+  --space-12: 3.429rem;  /* 48px */
+
+  /* Origin Border Radius */
+  --radius-half: 0.143rem;  /* 2px */
+  --radius-1: 0.286rem;     /* 4px */
+  --radius-2: 0.571rem;     /* 8px */
+  --radius-3: 0.857rem;     /* 12px */
+  --radius-4: 1.143rem;     /* 16px */
+  --radius-full: 9999px;
+
+  /* Origin Elevation - Light Mode */
+  --elevation-low-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --elevation-medium-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --elevation-high-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  /* =====================================================================
+     THEME TOKENS — "Heirloom" (light)
+
+     Two layers, so retheming is a one-block edit:
+       1. PRIMITIVES (--p-*): the raw palette. Change ONLY these (and the
+          matching dark block below) to introduce a new theme.
+       2. SEMANTICS (--color-*): stable names every component uses. They map
+          onto the primitives and never change between themes.
+     ===================================================================== */
+
+  /* 1. Primitives — Heirloom light */
+  --p-ground: #f4efdd;        /* warm page background */
+  --p-surface: #fffdf7;       /* cards / raised surfaces */
+  --p-surface-2: #ede7d3;     /* subtle fills, subdued borders */
+  --p-hover: #e7e0c9;         /* hover wash */
+  --p-line: #e3dcc4;          /* default borders */
+  --p-line-strong: #cfc7a9;   /* hover borders */
+  --p-ink: #2a2a20;           /* primary text */
+  --p-ink-2: #6e6857;         /* secondary text */
+  --p-ink-3: #a9a28c;         /* disabled / faint */
+  --p-on-brand: #fffdf7;      /* text/icons on a brand fill */
+  --p-brand: #1e4d2b;         /* pine — primary */
+  --p-brand-strong: #14351f;  /* pressed / emphasis */
+  --p-brand-tint: #e4ede0;    /* brand-subdued backgrounds */
+  --p-gold: #b45309;          /* gold accent */
+  --p-gold-tint: #f5e9d2;
+  --p-success: #2f7a44;       /* money up (kept distinct from pine chrome) */
+  --p-success-tint: #e2eee1;
+  --p-danger: #b91c1c;        /* money down / errors */
+  --p-danger-tint: #f7e4e1;
+  --p-warning: #9a6412;       /* warning text */
+  --p-warning-bg: #b7791f;    /* warning fill */
+  --p-warning-tint: #f7ecd2;
+  --p-info: #1f6f78;          /* teal */
+  --p-info-tint: #ddebea;
+  --p-focus-ring: rgba(30, 77, 43, 0.25);
+
+  /* 2. Semantics — map onto the primitives above */
+  --color-background-base-default: var(--p-surface);
+  --color-background-base-subdued: var(--p-ground);
+  --color-background-base-hover: var(--p-hover);
+  --color-background-brand-default: var(--p-brand);
+  --color-background-brand-subdued: var(--p-brand-tint);
+  --color-background-critical-default: var(--p-danger);
+  --color-background-critical-subdued: var(--p-danger-tint);
+  --color-background-success-default: var(--p-success);
+  --color-background-success-subdued: var(--p-success-tint);
+  --color-background-warning-default: var(--p-warning-bg);
+  --color-background-warning-subdued: var(--p-warning-tint);
+  --color-background-info-default: var(--p-info);
+  --color-background-info-subdued: var(--p-info-tint);
+  --color-background-accent-default: var(--p-gold);
+  --color-background-accent-subdued: var(--p-gold-tint);
+
+  --color-text-base-default: var(--p-ink);
+  --color-text-base-subdued: var(--p-ink-2);
+  --color-text-base-disabled: var(--p-ink-3);
+  --color-text-inverse: var(--p-on-brand);
+  --color-text-brand: var(--p-brand);
+  --color-text-critical: var(--p-danger);
+  --color-text-success: var(--p-success);
+  --color-text-warning: var(--p-warning);
+  --color-text-accent: var(--p-gold);
+
+  --color-border-base-default: var(--p-line);
+  --color-border-base-subdued: var(--p-surface-2);
+  --color-border-base-hover: var(--p-line-strong);
+  --color-border-brand: var(--p-brand);
+  --color-border-critical: var(--p-danger);
+  --color-border-focus: var(--p-brand);
+  --color-focus-ring: var(--p-focus-ring);
+
+  --color-icon-base-default: var(--p-ink-2);
+  --color-icon-base-subdued: var(--p-ink-3);
+  --color-icon-brand: var(--p-brand);
+  --color-icon-critical: var(--p-danger);
+
+  /* Legacy compatibility */
+  --background: var(--color-background-base-subdued);
+  --foreground: var(--color-text-base-default);
+}
+
+/* THEME TOKENS — "Heirloom" (dark). Only primitives + elevation change; the
+   semantic mappings in :root above are inherited. The :not([data-theme='light'])
+   guard lets a future in-app theme toggle override the OS preference. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --p-ground: #1c1b15;
+    --p-surface: #26251d;
+    --p-surface-2: #302e23;
+    --p-hover: #3a3729;
+    --p-line: #3a3729;
+    --p-line-strong: #4c4835;
+    --p-ink: #ece7d6;
+    --p-ink-2: #b0a98f;
+    --p-ink-3: #7c765f;
+    --p-on-brand: #14251b;
+    --p-brand: #6fb07e;
+    --p-brand-strong: #8fc79e;
+    --p-brand-tint: rgba(111, 176, 126, 0.16);
+    --p-gold: #d9a441;
+    --p-gold-tint: rgba(217, 164, 65, 0.16);
+    --p-success: #6fb07e;
+    --p-success-tint: rgba(111, 176, 126, 0.16);
+    --p-danger: #e5736b;
+    --p-danger-tint: rgba(229, 115, 107, 0.16);
+    --p-warning: #e4c06a;
+    --p-warning-bg: #d9a441;
+    --p-warning-tint: rgba(217, 164, 65, 0.16);
+    --p-info: #5fb6be;
+    --p-info-tint: rgba(95, 182, 190, 0.16);
+    --p-focus-ring: rgba(143, 199, 158, 0.3);
+
+    /* Elevation — dark */
+    --elevation-low-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.18);
+    --elevation-medium-shadow: 0 4px 6px rgba(0, 0, 0, 0.24), 0 2px 4px rgba(0, 0, 0, 0.18);
+    --elevation-high-shadow: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Base Styles */
+html {
+  font-size: 14px; /* Origin's base font size */
+}
+
+body {
+  color: var(--color-text-base-default);
+  background: var(--color-background-base-subdued);
+  font-family: var(--font-stack-inter);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Origin Typography Utilities */
+.heading-large {
+  font-family: var(--font-stack-matter);
+  font-size: 2rem;
+  line-height: 2.286rem;
+  font-weight: 700;
+  letter-spacing: -0.0025em;
+}
+
+.heading-medium {
+  font-family: var(--font-stack-matter);
+  font-size: 1.714rem;
+  line-height: 2.286rem;
+  font-weight: 700;
+  letter-spacing: -0.002em;
+}
+
+.heading-small {
+  font-family: var(--font-stack-matter);
+  font-size: 1.429rem;
+  line-height: 1.714rem;
+  font-weight: 600;
+}
+
+.heading-xsmall {
+  font-family: var(--font-stack-matter);
+  font-size: 1.143rem;
+  line-height: 1.714rem;
+  font-weight: 600;
+}
+
+.text-large {
+  font-size: 1.286rem;
+  line-height: 2.286rem;
+}
+
+.text-medium {
+  font-size: 1.143rem;
+  line-height: 1.714rem;
+}
+
+.text-small {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-xsmall {
+  font-size: 0.857rem;
+  line-height: 1.286rem;
+}
+
+/* Origin Card Style */
+.origin-card {
+  background: var(--color-background-base-default);
+  border: 1px solid var(--color-border-base-default);
+  border-radius: var(--radius-3);
+  box-shadow: var(--elevation-low-shadow);
+}
+
+.origin-card-elevated {
+  background: var(--color-background-base-default);
+  border: 1px solid var(--color-border-base-subdued);
+  border-radius: var(--radius-3);
+  box-shadow: var(--elevation-medium-shadow);
+}
+
+/* Origin Button Styles */
+.origin-btn {
+  font-family: var(--font-stack-inter);
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-2);
+  transition: all 150ms ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.origin-btn-primary {
+  background: var(--color-background-brand-default);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+.origin-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.origin-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.origin-btn-secondary {
+  background: var(--color-background-base-default);
+  color: var(--color-text-base-default);
+  border: 1px solid var(--color-border-base-default);
+}
+
+.origin-btn-secondary:hover {
+  background: var(--color-background-base-hover);
+  border-color: var(--color-border-base-hover);
+}
+
+.origin-btn-ghost {
+  background: transparent;
+  color: var(--color-text-base-subdued);
+  border: none;
+}
+
+.origin-btn-ghost:hover {
+  background: var(--color-background-base-hover);
+  color: var(--color-text-base-default);
+}
+
+/* Origin Input Styles */
+.origin-input {
+  font-family: var(--font-stack-inter);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-background-base-default);
+  border: 1px solid var(--color-border-base-default);
+  border-radius: var(--radius-2);
+  color: var(--color-text-base-default);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.origin-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.origin-input::placeholder {
+  color: var(--color-text-base-disabled);
+}
+
+/* Origin Select Styles */
+.origin-select {
+  font-family: var(--font-stack-inter);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  padding: var(--space-1) var(--space-3);
+  padding-right: var(--space-8);
+  background: var(--color-background-base-default);
+  border: 1px solid var(--color-border-base-default);
+  border-radius: var(--radius-2);
+  color: var(--color-text-base-default);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235f6368' d='M2.5 4.5L6 8l3.5-3.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-2) center;
+}
+
+.origin-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* Origin Badge/Tag Styles */
+.origin-badge {
+  font-family: var(--font-stack-inter);
+  font-size: 0.857rem;
+  font-weight: 500;
+  line-height: 1.286rem;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Custom scrollbar - Origin style */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background-base-subdued);
+  border-radius: var(--radius-1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-base-default);
+  border-radius: var(--radius-1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-base-hover);
+}

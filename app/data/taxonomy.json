@@ -1,0 +1,661 @@
+{
+  "version": "1.0",
+  "categories": [
+    {
+      "id": "housing",
+      "name": "Housing",
+      "description": "All housing-related expenses including rent, mortgage, and home maintenance",
+      "color": "#4285f4",
+      "subcategories": [
+        {
+          "id": "rent",
+          "name": "Rent",
+          "description": "Monthly rent payments",
+          "examples": ["AVALON", "EQUITY RESIDENTIAL", "GREYSTAR", "APARTMENT RENT"]
+        },
+        {
+          "id": "mortgage",
+          "name": "Mortgage",
+          "description": "Monthly mortgage payments",
+          "examples": ["WELLS FARGO MORTGAGE", "CHASE MORTGAGE", "ROCKET MORTGAGE", "QUICKEN LOANS"]
+        },
+        {
+          "id": "property-tax",
+          "name": "Property Tax",
+          "description": "Property tax payments",
+          "examples": ["COUNTY TAX", "PROPERTY TAX", "REAL ESTATE TAX"]
+        },
+        {
+          "id": "hoa",
+          "name": "HOA",
+          "description": "Homeowner association fees",
+          "examples": ["HOA", "HOMEOWNER ASSOC", "CONDO ASSOC"]
+        },
+        {
+          "id": "home-insurance",
+          "name": "Home Insurance",
+          "description": "Homeowner or renter insurance",
+          "examples": ["STATE FARM HOME", "ALLSTATE HOME", "LEMONADE", "RENTERS INS"]
+        },
+        {
+          "id": "maintenance",
+          "name": "Maintenance",
+          "description": "Home repairs and maintenance",
+          "examples": ["HOME DEPOT", "LOWES", "ACE HARDWARE", "PLUMBER", "ELECTRICIAN"]
+        }
+      ]
+    },
+    {
+      "id": "utilities",
+      "name": "Utilities",
+      "description": "Monthly utility bills and services",
+      "color": "#669df6",
+      "subcategories": [
+        {
+          "id": "electric",
+          "name": "Electric",
+          "description": "Electricity bills",
+          "examples": ["PG&E", "PACIFIC GAS", "EDISON", "DUKE ENERGY", "CON ED"]
+        },
+        {
+          "id": "gas",
+          "name": "Gas",
+          "description": "Natural gas bills",
+          "examples": ["SOCALGAS", "NATIONAL GRID", "ATMOS ENERGY"]
+        },
+        {
+          "id": "water",
+          "name": "Water",
+          "description": "Water and sewer bills",
+          "examples": ["WATER DEPT", "CITY WATER", "SEWER"]
+        },
+        {
+          "id": "internet",
+          "name": "Internet",
+          "description": "Internet service",
+          "examples": ["COMCAST", "XFINITY", "AT&T INTERNET", "SPECTRUM", "VERIZON FIOS"]
+        },
+        {
+          "id": "phone",
+          "name": "Phone",
+          "description": "Phone and mobile service",
+          "examples": ["T-MOBILE", "VERIZON WIRELESS", "AT&T WIRELESS", "MINT MOBILE"]
+        },
+        {
+          "id": "trash",
+          "name": "Trash",
+          "description": "Trash and recycling services",
+          "examples": ["WASTE MANAGEMENT", "REPUBLIC SERVICES", "TRASH"]
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "name": "Food",
+      "description": "All food and beverage purchases, whether groceries or dining out",
+      "color": "#0f9d58",
+      "subcategories": [
+        {
+          "id": "grocery",
+          "name": "Grocery",
+          "description": "Supermarkets and food stores",
+          "examples": ["COSTCO", "SAFEWAY", "WHOLE FOODS", "TRADER JOES", "KROGER", "WALMART GROCERY", "TARGET", "ALDI", "PUBLIX"]
+        },
+        {
+          "id": "restaurant",
+          "name": "Restaurant",
+          "description": "Dine-in and takeout meals",
+          "examples": ["CHIPOTLE", "OLIVE GARDEN", "MCDONALDS", "CHICK-FIL-A", "PANERA", "WENDYS", "TACO BELL"]
+        },
+        {
+          "id": "coffee",
+          "name": "Coffee",
+          "description": "Coffee shops and cafes",
+          "examples": ["STARBUCKS", "DUNKIN", "PEETS COFFEE", "BLUE BOTTLE", "PHILZ"]
+        },
+        {
+          "id": "delivery",
+          "name": "Delivery",
+          "description": "Food delivery services",
+          "examples": ["DOORDASH", "UBER EATS", "GRUBHUB", "POSTMATES", "INSTACART"]
+        },
+        {
+          "id": "alcohol",
+          "name": "Alcohol",
+          "description": "Bars, breweries, and alcohol purchases",
+          "examples": ["TOTAL WINE", "BEVMO", "LIQUOR", "BREWERY", "BAR TAB"]
+        }
+      ]
+    },
+    {
+      "id": "transportation",
+      "name": "Transportation",
+      "description": "All transportation-related expenses",
+      "color": "#f9ab00",
+      "subcategories": [
+        {
+          "id": "fuel",
+          "name": "Fuel",
+          "description": "Gas stations and EV charging",
+          "examples": ["SHELL", "CHEVRON", "EXXON", "BP", "ARCO", "TESLA SUPERCHARGER", "CHARGEPOINT"]
+        },
+        {
+          "id": "transit",
+          "name": "Transit",
+          "description": "Public transportation",
+          "examples": ["BART", "MUNI", "MTA", "METRO", "CALTRAIN", "AMTRAK"]
+        },
+        {
+          "id": "rideshare",
+          "name": "Rideshare",
+          "description": "Uber, Lyft, and taxi services",
+          "examples": ["UBER", "LYFT", "TAXI", "CAB"]
+        },
+        {
+          "id": "parking",
+          "name": "Parking",
+          "description": "Parking fees and meters",
+          "examples": ["PARKING", "SPOTHERO", "PARKWHIZ", "METER"]
+        },
+        {
+          "id": "car-insurance",
+          "name": "Car Insurance",
+          "description": "Auto insurance premiums",
+          "examples": ["GEICO", "PROGRESSIVE", "STATE FARM AUTO", "ALLSTATE AUTO", "USAA"]
+        },
+        {
+          "id": "car-payment",
+          "name": "Car Payment",
+          "description": "Car loan or lease payments",
+          "examples": ["TOYOTA FINANCIAL", "HONDA FINANCIAL", "BMW FINANCIAL", "CAR LOAN"]
+        },
+        {
+          "id": "car-maintenance",
+          "name": "Car Maintenance",
+          "description": "Car repairs, service, and maintenance",
+          "examples": ["JIFFY LUBE", "AUTOZONE", "PENSKE", "FIRESTONE", "GOODYEAR", "MIDAS"]
+        },
+        {
+          "id": "vehicle-registration",
+          "name": "Vehicle Registration",
+          "description": "DMV registration fees and vehicle taxes",
+          "examples": ["DMV", "VEHICLE REGISTRATION", "AUTO REGISTRATION", "LICENSE PLATE", "VEHICLE TAX", "CAR TAX"]
+        }
+      ]
+    },
+    {
+      "id": "healthcare",
+      "name": "Healthcare",
+      "description": "Medical and health-related expenses",
+      "color": "#d93025",
+      "subcategories": [
+        {
+          "id": "doctor",
+          "name": "Doctor",
+          "description": "Doctor visits and medical services",
+          "examples": ["KAISER", "ONE MEDICAL", "STANFORD HEALTH", "URGENT CARE", "DR"]
+        },
+        {
+          "id": "dental",
+          "name": "Dental",
+          "description": "Dental care and services",
+          "examples": ["DENTIST", "DENTAL", "ORTHODONTIST", "SMILE DIRECT"]
+        },
+        {
+          "id": "vision",
+          "name": "Vision",
+          "description": "Eye care and glasses",
+          "examples": ["LENSCRAFTERS", "WARBY PARKER", "EYECARE", "OPTOMETRIST"]
+        },
+        {
+          "id": "pharmacy",
+          "name": "Pharmacy",
+          "description": "Prescriptions and medications",
+          "examples": ["CVS", "WALGREENS", "RITE AID", "PHARMACY", "RX"]
+        },
+        {
+          "id": "health-insurance",
+          "name": "Health Insurance",
+          "description": "Health insurance premiums",
+          "examples": ["BLUE CROSS", "AETNA", "CIGNA", "UNITED HEALTH", "ANTHEM"]
+        }
+      ]
+    },
+    {
+      "id": "shopping",
+      "name": "Shopping",
+      "description": "General shopping and retail purchases",
+      "color": "#e91e63",
+      "subcategories": [
+        {
+          "id": "clothing",
+          "name": "Clothing",
+          "description": "Apparel and fashion",
+          "examples": ["NORDSTROM", "ZARA", "H&M", "GAP", "OLD NAVY", "UNIQLO", "NIKE", "LULULEMON"]
+        },
+        {
+          "id": "electronics",
+          "name": "Electronics",
+          "description": "Electronics and gadgets",
+          "examples": ["BEST BUY", "APPLE STORE", "MICRO CENTER", "B&H PHOTO"]
+        },
+        {
+          "id": "home-goods",
+          "name": "Home Goods",
+          "description": "Home decor and furnishings",
+          "examples": ["BED BATH", "CRATE BARREL", "IKEA", "WEST ELM", "POTTERY BARN", "WILLIAMS SONOMA"]
+        },
+        {
+          "id": "amazon",
+          "name": "Amazon",
+          "description": "Amazon purchases",
+          "examples": ["AMAZON", "AMZN", "PRIME"]
+        },
+        {
+          "id": "general",
+          "name": "General",
+          "description": "General retail and department stores",
+          "examples": ["WALMART", "TARGET", "COSTCO", "SAMS CLUB", "TJ MAXX", "ROSS", "MARSHALLS"]
+        }
+      ]
+    },
+    {
+      "id": "entertainment",
+      "name": "Entertainment",
+      "description": "Entertainment, media, and recreational activities",
+      "color": "#9c27b0",
+      "subcategories": [
+        {
+          "id": "streaming",
+          "name": "Streaming",
+          "description": "Streaming services and subscriptions",
+          "examples": ["NETFLIX", "SPOTIFY", "HULU", "DISNEY+", "HBO MAX", "APPLE TV", "YOUTUBE PREMIUM"]
+        },
+        {
+          "id": "movies",
+          "name": "Movies",
+          "description": "Movie theaters and rentals",
+          "examples": ["AMC", "REGAL", "CINEMARK", "FANDANGO", "ALAMO DRAFTHOUSE"]
+        },
+        {
+          "id": "games",
+          "name": "Games",
+          "description": "Video games and gaming services",
+          "examples": ["STEAM", "PLAYSTATION", "XBOX", "NINTENDO", "EPIC GAMES"]
+        },
+        {
+          "id": "concerts",
+          "name": "Concerts",
+          "description": "Live music and performances",
+          "examples": ["TICKETMASTER", "LIVE NATION", "AXS", "STUBHUB"]
+        },
+        {
+          "id": "sports",
+          "name": "Sports",
+          "description": "Sports events and tickets",
+          "examples": ["NBA", "NFL", "MLB", "SEATGEEK", "SPORTS TICKETS"]
+        },
+        {
+          "id": "hobbies",
+          "name": "Hobbies",
+          "description": "Hobby supplies and activities",
+          "examples": ["MICHAELS", "JOANN", "HOBBY LOBBY", "REI", "BASS PRO"]
+        }
+      ]
+    },
+    {
+      "id": "travel",
+      "name": "Travel",
+      "description": "Travel and vacation expenses",
+      "color": "#00bcd4",
+      "subcategories": [
+        {
+          "id": "flights",
+          "name": "Flights",
+          "description": "Airline tickets and fees",
+          "examples": ["UNITED", "AMERICAN AIRLINES", "DELTA", "SOUTHWEST", "JETBLUE", "ALASKA AIR"]
+        },
+        {
+          "id": "hotels",
+          "name": "Hotels",
+          "description": "Hotel stays and lodging",
+          "examples": ["MARRIOTT", "HILTON", "HYATT", "AIRBNB", "VRBO", "BOOKING.COM"]
+        },
+        {
+          "id": "car-rental",
+          "name": "Car Rental",
+          "description": "Rental cars and services",
+          "examples": ["HERTZ", "ENTERPRISE", "NATIONAL", "AVIS", "BUDGET", "TURO"]
+        },
+        {
+          "id": "activities",
+          "name": "Activities",
+          "description": "Tours, attractions, and vacation activities",
+          "examples": ["VIATOR", "GETTYSBURG", "MUSEUM", "TOUR", "EXCURSION"]
+        }
+      ]
+    },
+    {
+      "id": "kids",
+      "name": "Kids",
+      "description": "Child-related expenses",
+      "color": "#ff9800",
+      "subcategories": [
+        {
+          "id": "childcare",
+          "name": "Childcare",
+          "description": "Daycare and babysitting",
+          "examples": ["DAYCARE", "KINDERCARE", "BRIGHT HORIZONS", "BABYSITTER", "NANNY"]
+        },
+        {
+          "id": "school",
+          "name": "School/Tuition",
+          "description": "School fees and tuition",
+          "examples": ["SCHOOL", "TUITION", "ACADEMY", "LEARNING CENTER"]
+        },
+        {
+          "id": "activities",
+          "name": "Activities",
+          "description": "Kids' classes and extracurricular activities",
+          "examples": ["KUMON", "LITTLE LEAGUE", "SOCCER", "SWIM CLASS", "DANCE CLASS", "PIANO"]
+        },
+        {
+          "id": "supplies",
+          "name": "Supplies",
+          "description": "School and art supplies",
+          "examples": ["OFFICE DEPOT", "STAPLES", "SCHOOL SUPPLIES"]
+        },
+        {
+          "id": "toys",
+          "name": "Toys",
+          "description": "Toys and games for kids",
+          "examples": ["LEGO", "TOYS R US", "DISNEY STORE", "BUILD A BEAR", "AMERICAN GIRL"]
+        }
+      ]
+    },
+    {
+      "id": "pets",
+      "name": "Pets",
+      "description": "Pet-related expenses",
+      "color": "#8bc34a",
+      "subcategories": [
+        {
+          "id": "food",
+          "name": "Pet Food",
+          "description": "Pet food and treats",
+          "examples": ["PETCO", "PETSMART", "CHEWY", "PET FOOD"]
+        },
+        {
+          "id": "vet",
+          "name": "Vet",
+          "description": "Veterinary care",
+          "examples": ["VCA", "BANFIELD", "VETERINARY", "VET CLINIC", "ANIMAL HOSPITAL"]
+        },
+        {
+          "id": "grooming",
+          "name": "Grooming",
+          "description": "Pet grooming services",
+          "examples": ["PET GROOMING", "DOGGY STYLE", "GROOMER"]
+        },
+        {
+          "id": "supplies",
+          "name": "Supplies",
+          "description": "Pet supplies and accessories",
+          "examples": ["PET SUPPLIES", "PETCO", "PETSMART"]
+        }
+      ]
+    },
+    {
+      "id": "personal-care",
+      "name": "Personal Care",
+      "description": "Personal care and wellness expenses",
+      "color": "#00acc1",
+      "subcategories": [
+        {
+          "id": "haircut",
+          "name": "Haircut",
+          "description": "Hair salons and barbershops",
+          "examples": ["SUPERCUTS", "GREAT CLIPS", "SALON", "BARBER", "HAIR"]
+        },
+        {
+          "id": "gym",
+          "name": "Gym",
+          "description": "Gym memberships and fitness",
+          "examples": ["EQUINOX", "24 HOUR FITNESS", "PLANET FITNESS", "ORANGETHEORY", "CROSSFIT", "PELOTON"]
+        },
+        {
+          "id": "spa",
+          "name": "Spa",
+          "description": "Spa and massage services",
+          "examples": ["SPA", "MASSAGE ENVY", "BURKE WILLIAMS", "HAND AND STONE"]
+        },
+        {
+          "id": "personal-items",
+          "name": "Personal Items",
+          "description": "Personal care products",
+          "examples": ["SEPHORA", "ULTA", "BATH BODY WORKS", "LUSH"]
+        }
+      ]
+    },
+    {
+      "id": "education",
+      "name": "Education",
+      "description": "Education and learning expenses",
+      "color": "#3f51b5",
+      "subcategories": [
+        {
+          "id": "tuition",
+          "name": "Tuition",
+          "description": "College and university tuition",
+          "examples": ["UNIVERSITY", "COLLEGE", "TUITION"]
+        },
+        {
+          "id": "books",
+          "name": "Books",
+          "description": "Books and textbooks",
+          "examples": ["BARNES NOBLE", "AMAZON BOOKS", "CHEGG", "TEXTBOOK"]
+        },
+        {
+          "id": "courses",
+          "name": "Courses",
+          "description": "Online courses and certifications",
+          "examples": ["UDEMY", "COURSERA", "SKILLSHARE", "LINKEDIN LEARNING", "MASTERCLASS"]
+        },
+        {
+          "id": "supplies",
+          "name": "Supplies",
+          "description": "Educational supplies",
+          "examples": ["OFFICE DEPOT", "STAPLES"]
+        }
+      ]
+    },
+    {
+      "id": "gifts-donations",
+      "name": "Gifts & Donations",
+      "description": "Gifts, charity, and donations",
+      "color": "#e91e63",
+      "subcategories": [
+        {
+          "id": "gifts",
+          "name": "Gifts",
+          "description": "Gifts for others",
+          "examples": ["ETSY", "GIFT CARD", "1800FLOWERS", "HALLMARK"]
+        },
+        {
+          "id": "charity",
+          "name": "Charity",
+          "description": "Charitable donations",
+          "examples": ["RED CROSS", "UNITED WAY", "SALVATION ARMY", "GOFUNDME", "CHARITY"]
+        },
+        {
+          "id": "religious",
+          "name": "Religious",
+          "description": "Religious donations and tithes",
+          "examples": ["CHURCH", "TITHE", "SYNAGOGUE", "TEMPLE", "MOSQUE"]
+        }
+      ]
+    },
+    {
+      "id": "financial",
+      "name": "Financial",
+      "description": "Banking, fees, and financial services",
+      "color": "#607d8b",
+      "subcategories": [
+        {
+          "id": "bank-fees",
+          "name": "Bank Fees",
+          "description": "Bank account fees",
+          "examples": ["BANK FEE", "SERVICE CHARGE", "MONTHLY FEE", "ATM FEE"]
+        },
+        {
+          "id": "interest",
+          "name": "Interest",
+          "description": "Interest charges on loans or credit",
+          "examples": ["INTEREST CHARGE", "FINANCE CHARGE"]
+        },
+        {
+          "id": "investment-fees",
+          "name": "Investment Fees",
+          "description": "Investment and brokerage fees",
+          "examples": ["FIDELITY", "SCHWAB", "VANGUARD", "ROBINHOOD", "E*TRADE"]
+        },
+        {
+          "id": "other-insurance",
+          "name": "Other Insurance",
+          "description": "Life, umbrella, and other insurance",
+          "examples": ["LIFE INSURANCE", "UMBRELLA", "LIABILITY"]
+        }
+      ]
+    },
+    {
+      "id": "taxes",
+      "name": "Taxes",
+      "description": "Income taxes, tax payments, refunds, and tax-related expenses",
+      "color": "#795548",
+      "subcategories": [
+        {
+          "id": "income-tax-payment",
+          "name": "Income Tax Payment",
+          "description": "Federal and state income tax payments",
+          "examples": ["IRS", "EFTPS", "PAY.GOV", "STATE TAX", "FRANCHISE TAX", "DEPT OF REVENUE", "1040", "TAX PAYMENT"]
+        },
+        {
+          "id": "income-tax-refund",
+          "name": "Tax Refund",
+          "description": "Federal and state income tax refunds",
+          "examples": ["IRS TREAS", "TAX REFUND", "STATE REFUND", "TREASURY", "TAX REF"]
+        },
+        {
+          "id": "estimated-tax",
+          "name": "Estimated Tax Payment",
+          "description": "Quarterly estimated tax payments",
+          "examples": ["1040-ES", "ESTIMATED TAX", "QUARTERLY TAX", "EFTPS ESTIMATE"]
+        },
+        {
+          "id": "tax-preparation",
+          "name": "Tax Preparation",
+          "description": "Tax software and professional preparation fees",
+          "examples": ["TURBOTAX", "H&R BLOCK", "HRBLOCK", "TAXACT", "CPA", "TAX PREP", "INTUIT TAX", "JACKSON HEWITT"]
+        },
+        {
+          "id": "self-employment-tax",
+          "name": "Self-Employment Tax",
+          "description": "Self-employment tax payments (Social Security/Medicare)",
+          "examples": ["SE TAX", "SELF EMPLOYMENT", "SCHEDULE SE"]
+        }
+      ]
+    },
+    {
+      "id": "income",
+      "name": "Income",
+      "description": "Income and money received",
+      "color": "#0f9d58",
+      "subcategories": [
+        {
+          "id": "salary",
+          "name": "Salary",
+          "description": "Payroll and salary deposits",
+          "examples": ["PAYROLL", "DIRECT DEPOSIT", "SALARY", "WAGES"]
+        },
+        {
+          "id": "refund",
+          "name": "Refund",
+          "description": "Refunds and returns",
+          "examples": ["REFUND", "RETURN", "CREDIT", "CASHBACK"]
+        },
+        {
+          "id": "transfer-in",
+          "name": "Transfer In",
+          "description": "Money transferred in from other accounts",
+          "examples": ["TRANSFER FROM", "DEPOSIT", "VENMO", "ZELLE", "PAYPAL"]
+        },
+        {
+          "id": "interest-earned",
+          "name": "Interest Earned",
+          "description": "Interest earned on savings",
+          "examples": ["INTEREST PAYMENT", "DIVIDEND", "INTEREST EARNED"]
+        }
+      ]
+    },
+    {
+      "id": "transfer",
+      "name": "Transfer",
+      "description": "Transfers between accounts",
+      "color": "#9aa0a6",
+      "subcategories": [
+        {
+          "id": "between-accounts",
+          "name": "Between Accounts",
+          "description": "Transfers between own accounts",
+          "examples": ["TRANSFER TO", "TRANSFER", "ONLINE TRANSFER", "INTERNAL TRANSFER"]
+        },
+        {
+          "id": "cc-payment",
+          "name": "Credit Card Payment",
+          "description": "Credit card payments",
+          "examples": ["CC PAYMENT", "CARD PAYMENT", "AUTOPAY", "CREDIT CARD PAYMENT"]
+        },
+        {
+          "id": "investment",
+          "name": "Investment Contribution",
+          "description": "Money moved from a bank account into a brokerage or investment account (purchases, IRA/401k contributions, crypto buys). Asset transfer, not an expense.",
+          "examples": [
+            "VANGUARD BUY INVESTMENT",
+            "VMC PUR",
+            "FIDELITY BROKERAGE",
+            "SCHWAB BROKERAGE",
+            "ROBINHOOD",
+            "COINBASE",
+            "WEALTHFRONT",
+            "BETTERMENT",
+            "MERRILL LYNCH",
+            "E*TRADE",
+            "TD AMERITRADE",
+            "SOFI INVEST",
+            "M1 FINANCE"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "name": "Other",
+      "description": "Uncategorized transactions",
+      "color": "#78909c",
+      "subcategories": [
+        {
+          "id": "uncategorized",
+          "name": "Uncategorized",
+          "description": "Transactions that don't fit other categories",
+          "examples": []
+        },
+        {
+          "id": "miscellaneous",
+          "name": "Miscellaneous",
+          "description": "Various other expenses",
+          "examples": []
+        }
+      ]
+    }
+  ]
+}

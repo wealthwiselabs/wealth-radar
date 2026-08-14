@@ -1,0 +1,61 @@
+# Build output
+.next/
+out/
+public/
+
+# Playwright's isolated Next.js build dir (see NEXT_DIST_DIR in
+# playwright.config.ts) — never the same as .next/, see the comment there.
+.next-e2e/
+
+# Dependencies
+node_modules/
+
+# Environment
+.env.local
+.env*.local
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug
+npm-debug.log*
+
+# Vercel
+.vercel
+
+# Personal financial data — never commit (even to a private repo).
+# data/taxonomy.json is the only file in data/ that should be tracked.
+data/transactions.csv
+data/preferences.json
+
+# Real bank-statement PDFs used for local testing — PII, do not ship.
+# (Anchored to repo root so it doesn't also match src/test/.)
+/test/
+
+# Browser-automation cache
+.playwright-mcp/
+
+# Local database (real app.db + throwaway test DBs) — holds personal data, never commit
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+
+# Local pre-mutation DB snapshots (undo points) — never commit.
+data/snapshots/
+
+# Playwright: the e2e database and its preferences.json mirror live in their
+# own directory (never data/ itself) so they can never be confused with, or
+# overwrite, the real app.db / preferences.json.
+data/e2e/
+test-results/
+playwright-report/
+.next-verify/

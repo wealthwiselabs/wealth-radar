@@ -1,0 +1,59 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Keep PR CI snappy by cancelling superseded runs; never cancel a main run.
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Runs on every PR and every push to main. This is the gate.
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  # Auto-deploy to Fly.io — only after `verify` passes, only for a real push to
+  # main of THIS repo. Never runs on PRs or forks (forks also lack the secrets).
+  deploy:
+    needs: verify
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'wealthwiselabs/expense-tracker'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: fly-deploy
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Real owner names are injected here from a secret, so they never live in
+      # the repo. If ACCOUNT_OWNERS is unset the app falls back to generic names.
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only --build-arg NEXT_PUBLIC_ACCOUNT_OWNERS="$ACCOUNT_OWNERS"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          ACCOUNT_OWNERS: ${{ secrets.ACCOUNT_OWNERS }}

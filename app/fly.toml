@@ -1,0 +1,48 @@
+# Fly.io config. Rename `app` (must be globally unique) and set `primary_region`
+# to the airport code nearest you (run `fly platform regions` to list them).
+# See DEPLOY.md for the full walkthrough.
+app = "wealthwiselabs-tracker"
+primary_region = "iad"
+
+[build]
+  # NEXT_PUBLIC_* is baked into the client bundle at build time. This is the
+  # generic default committed to the repo; the CI deploy overrides it with the
+  # real names via `--build-arg` from the ACCOUNT_OWNERS GitHub secret, so no
+  # personal names live in version control. A manual `fly deploy` that wants the
+  # real names must pass `--build-arg NEXT_PUBLIC_ACCOUNT_OWNERS="A,B"` too.
+  [build.args]
+    NEXT_PUBLIC_ACCOUNT_OWNERS = "Person 1,Person 2"
+
+[env]
+  # The SQLite database lives on the mounted volume (see [mounts] below), so it
+  # survives deploys and restarts.
+  DATABASE_URL = "file:/data/app.db"
+  # Login gate: the username is non-secret and lives here; the password and
+  # cookie-signing secret are set via `fly secrets set AUTH_PASSWORD=... AUTH_SECRET=...`
+  # (never commit those). The gate activates once AUTH_PASSWORD is set.
+  AUTH_USERNAME = "wealthwise"
+
+# Persistent volume that holds app.db, its WAL, preferences.json, and snapshots.
+# Created once with: fly volumes create expense_data --size 1 --region <region>
+[mounts]
+  source = "expense_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Scale to zero when idle to keep cost near the volume's ~$0.15/GB-month; the
+  # first request after idle cold-starts in a few seconds. Set
+  # min_machines_running = 1 if you'd rather it always be warm (and want the
+  # 12-hour background Plaid sync to fire reliably) — costs a bit more.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+# IMPORTANT: keep this a SINGLE machine. A Fly volume attaches to one machine,
+# and file-based SQLite is not safe for multiple machines writing at once.
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

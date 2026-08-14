@@ -1,0 +1,29 @@
+node_modules
+.next
+.next-verify
+npm-debug.log*
+
+.git
+.gitignore
+
+# Secrets never belong in the image.
+.env
+.env.*
+!.env.example
+
+# Local data — never bake the live DB, WAL, snapshots, or exports into the
+# image. taxonomy.json IS shipped (checked-in seed config read at runtime).
+data/*
+!data/taxonomy.json
+
+# Not needed to build or run the server.
+**/__tests__
+*.test.ts
+*.test.tsx
+playwright.config.ts
+e2e
+docs
+.claude
+.vscode
+Dockerfile
+.dockerignore

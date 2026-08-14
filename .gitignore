@@ -1,0 +1,15 @@
+# OS junk
+.DS_Store
+**/.DS_Store
+
+# Personal financial data — separately versioned in its own git repo under data/.
+# Never embed it in this repo (it holds real transactions/preferences).
+/data/
+
+# Claude Code's working directory at the repo root: git worktrees and local
+# backups, all machine-specific. Anchored to the root on purpose — app/.claude
+# holds the tracked commands/skills symlinks and must stay versioned.
+/.claude/
+
+# Superpowers scratch (brainstorm mockups, SDD ledgers)
+.superpowers/

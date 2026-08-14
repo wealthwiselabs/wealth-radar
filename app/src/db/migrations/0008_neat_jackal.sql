@@ -1,0 +1,1 @@
+ALTER TABLE `cash_flows` ADD `superseded_by` text;

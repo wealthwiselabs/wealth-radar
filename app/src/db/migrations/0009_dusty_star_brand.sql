@@ -1,0 +1,1 @@
+ALTER TABLE `plaid_items` ADD `needs_investments_consent` integer DEFAULT false NOT NULL;

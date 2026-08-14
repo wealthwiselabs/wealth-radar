@@ -1,0 +1,52 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "description": "AI-powered expense tracker that classifies bank statement transactions",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "build:check": "NEXT_DIST_DIR=.next-verify next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "migrate:csv": "tsx scripts/migrate-csv.ts",
+    "accounts:dedupe": "tsx scripts/dedupe-accounts.ts",
+    "investments:import": "tsx scripts/import-roi-sheet.ts",
+    "investments:import-statements": "tsx scripts/import-statements.ts",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.41.0",
+    "better-sqlite3": "^12.11.1",
+    "chart.js": "^4.4.0",
+    "drizzle-orm": "^0.45.2",
+    "next": "15.4.10",
+    "pdfjs-dist": "^4.0.0",
+    "plaid": "^43.0.0",
+    "react": "^19.0.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^19.0.1",
+    "react-plaid-link": "^4.1.1",
+    "server-only": "^0.0.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.1.5",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/uuid": "^9.0.0",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.1.5",
+    "tsx": "^4.23.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.10"
+  }
+}

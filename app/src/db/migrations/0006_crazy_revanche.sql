@@ -1,0 +1,1 @@
+ALTER TABLE `cash_flows` ADD `security_id` text REFERENCES securities(id);
