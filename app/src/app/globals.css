@@ -43,6 +43,15 @@
           onto the primitives and never change between themes.
      ===================================================================== */
 
+  /* The palette follows the `data-theme` attribute on <html> and nothing else —
+     deliberately not `prefers-color-scheme`, which would need this whole dark
+     block duplicated under a media query. JS owns the resolution instead: the
+     default preference is System, and lib/theme.ts turns that into a concrete
+     light/dark attribute (before first paint, and again if the OS flips).
+     color-scheme keeps native widgets — scrollbars, form controls, the canvas
+     behind the page — in step with the palette. */
+  color-scheme: light;
+
   /* 1. Primitives — Heirloom light */
   --p-ground: #f4efdd;        /* warm page background */
   --p-surface: #fffdf7;       /* cards / raised surfaces */
@@ -116,41 +125,41 @@
 }
 
 /* THEME TOKENS — "Heirloom" (dark). Only primitives + elevation change; the
-   semantic mappings in :root above are inherited. The :not([data-theme='light'])
-   guard lets a future in-app theme toggle override the OS preference. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --p-ground: #1c1b15;
-    --p-surface: #26251d;
-    --p-surface-2: #302e23;
-    --p-hover: #3a3729;
-    --p-line: #3a3729;
-    --p-line-strong: #4c4835;
-    --p-ink: #ece7d6;
-    --p-ink-2: #b0a98f;
-    --p-ink-3: #7c765f;
-    --p-on-brand: #14251b;
-    --p-brand: #6fb07e;
-    --p-brand-strong: #8fc79e;
-    --p-brand-tint: rgba(111, 176, 126, 0.16);
-    --p-gold: #d9a441;
-    --p-gold-tint: rgba(217, 164, 65, 0.16);
-    --p-success: #6fb07e;
-    --p-success-tint: rgba(111, 176, 126, 0.16);
-    --p-danger: #e5736b;
-    --p-danger-tint: rgba(229, 115, 107, 0.16);
-    --p-warning: #e4c06a;
-    --p-warning-bg: #d9a441;
-    --p-warning-tint: rgba(217, 164, 65, 0.16);
-    --p-info: #5fb6be;
-    --p-info-tint: rgba(95, 182, 190, 0.16);
-    --p-focus-ring: rgba(143, 199, 158, 0.3);
+   semantic mappings in :root above are inherited. Reached either by choosing
+   Dark in Settings → Theme, or by leaving it on System with a dark OS. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
 
-    /* Elevation — dark */
-    --elevation-low-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.18);
-    --elevation-medium-shadow: 0 4px 6px rgba(0, 0, 0, 0.24), 0 2px 4px rgba(0, 0, 0, 0.18);
-    --elevation-high-shadow: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
-  }
+  --p-ground: #1c1b15;
+  --p-surface: #26251d;
+  --p-surface-2: #302e23;
+  --p-hover: #3a3729;
+  --p-line: #3a3729;
+  --p-line-strong: #4c4835;
+  --p-ink: #ece7d6;
+  --p-ink-2: #b0a98f;
+  --p-ink-3: #7c765f;
+  --p-on-brand: #14251b;
+  --p-brand: #6fb07e;
+  --p-brand-strong: #8fc79e;
+  --p-brand-tint: rgba(111, 176, 126, 0.16);
+  --p-gold: #d9a441;
+  --p-gold-tint: rgba(217, 164, 65, 0.16);
+  --p-success: #6fb07e;
+  --p-success-tint: rgba(111, 176, 126, 0.16);
+  --p-danger: #e5736b;
+  --p-danger-tint: rgba(229, 115, 107, 0.16);
+  --p-warning: #e4c06a;
+  --p-warning-bg: #d9a441;
+  --p-warning-tint: rgba(217, 164, 65, 0.16);
+  --p-info: #5fb6be;
+  --p-info-tint: rgba(95, 182, 190, 0.16);
+  --p-focus-ring: rgba(143, 199, 158, 0.3);
+
+  /* Elevation — dark */
+  --elevation-low-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.18);
+  --elevation-medium-shadow: 0 4px 6px rgba(0, 0, 0, 0.24), 0 2px 4px rgba(0, 0, 0, 0.18);
+  --elevation-high-shadow: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* Base Styles */

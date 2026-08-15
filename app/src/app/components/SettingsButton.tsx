@@ -2,26 +2,60 @@
 
 import { useEffect, useState } from 'react';
 import { getStoredApiKey, setStoredApiKey } from '@/lib/apiKey';
+import {
+  applyThemePreference,
+  getStoredThemePreference,
+  setStoredThemePreference,
+  type ThemePreference,
+} from '@/lib/theme';
 import Link from 'next/link';
+
+const THEMES: { value: ThemePreference; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+];
 
 export default function SettingsButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [keyInput, setKeyInput] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [theme, setTheme] = useState<ThemePreference>('system');
+  // The preference in force when the modal opened, so Cancel can put it back. A
+  // theme picker is worth previewing live — you cannot judge one from a label —
+  // but a live preview still has to honour Cancel like the key field does.
+  const [themeOnOpen, setThemeOnOpen] = useState<ThemePreference>('system');
 
   useEffect(() => {
     setHasKey(!!getStoredApiKey());
   }, [isOpen]);
 
   const open = () => {
+    const stored = getStoredThemePreference();
     setKeyInput(getStoredApiKey());
+    setTheme(stored);
+    setThemeOnOpen(stored);
     setIsOpen(true);
+  };
+
+  // Preview immediately; persisted only on Save.
+  const previewTheme = (next: ThemePreference) => {
+    setTheme(next);
+    applyThemePreference(next);
   };
 
   const save = () => {
     setStoredApiKey(keyInput);
+    setStoredThemePreference(theme);
     setHasKey(!!keyInput.trim());
+    setIsOpen(false);
+  };
+
+  // Every dismissal path — Cancel, the ×, the backdrop — drops the preview.
+  const cancel = () => {
+    applyThemePreference(themeOnOpen);
+    setTheme(themeOnOpen);
     setIsOpen(false);
   };
 
@@ -56,7 +90,7 @@ export default function SettingsButton() {
       {isOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-[var(--space-4)]"
-          onClick={() => setIsOpen(false)}
+          onClick={cancel}
         >
           <div
             className="origin-card-elevated w-full max-w-2xl max-h-[90vh] overflow-y-auto p-[var(--space-6)]"
@@ -66,12 +100,11 @@ export default function SettingsButton() {
               <div>
                 <h2 className="heading-xsmall text-[var(--color-text-base-default)]">Settings</h2>
                 <p className="text-small text-[var(--color-text-base-subdued)] mt-[var(--space-1)]">
-                  Your Anthropic API key powers PDF classification. It is stored only in this
-                  browser and sent only to this app's classify endpoint.
+                  Stored in this browser only.
                 </p>
               </div>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={cancel}
                 className="text-[var(--color-text-base-subdued)] hover:text-[var(--color-text-base-default)] text-xl leading-none"
                 aria-label="Close"
               >
@@ -100,7 +133,8 @@ export default function SettingsButton() {
               </button>
             </div>
             <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
-              Get a key at{' '}
+              Powers PDF classification, and is sent only to this app's classify endpoint. Get a
+              key at{' '}
               <a
                 href="https://console.anthropic.com/settings/keys"
                 target="_blank"
@@ -111,6 +145,43 @@ export default function SettingsButton() {
               </a>
               . If a server-side key is set in <code>.env.local</code>, this overrides it.
             </p>
+
+            <hr className="my-[var(--space-6)] border-[var(--color-border-base-subdued)]" />
+
+            <fieldset>
+              <legend className="text-small font-medium text-[var(--color-text-base-default)] mb-[var(--space-2)]">
+                Theme
+              </legend>
+              {/* Radios rather than buttons: mutually exclusive values with one
+                  selected is exactly what a radio group is, and it gets
+                  arrow-key navigation and screen-reader semantics for free. */}
+              <div className="flex gap-[var(--space-2)]">
+                {THEMES.map(({ value, label }) => (
+                  <label
+                    key={value}
+                    // The radio itself is sr-only, so the focus ring has to be
+                    // borrowed by the label — matching .origin-input:focus.
+                    className={`origin-btn cursor-pointer focus-within:shadow-[0_0_0_2px_var(--color-focus-ring)] ${
+                      theme === value ? 'origin-btn-primary' : 'origin-btn-secondary'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={value}
+                      checked={theme === value}
+                      onChange={() => previewTheme(value)}
+                      className="sr-only"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
+                System follows your device's appearance setting, and keeps following it if
+                that changes. Previewed as you pick; applied on Save.
+              </p>
+            </fieldset>
 
             <hr className="my-[var(--space-6)] border-[var(--color-border-base-subdued)]" />
 
@@ -131,7 +202,7 @@ export default function SettingsButton() {
                 Clear
               </button>
               <div className="flex gap-[var(--space-2)]">
-                <button onClick={() => setIsOpen(false)} className="origin-btn origin-btn-secondary">
+                <button onClick={cancel} className="origin-btn origin-btn-secondary">
                   Cancel
                 </button>
                 <button onClick={save} className="origin-btn origin-btn-primary">
