@@ -28,12 +28,40 @@ ChartJS.register(
 
 // Categorical series colors, tuned to sit alongside the Heirloom palette
 // (pine, clay/gold, teal, wine, sage, dusty blue). Chart.js draws to a canvas
-// and can't read CSS variables, so these are the one place chart colors live —
-// update here when the theme changes.
+// and can't read CSS variables, so this module is where chart colors live —
+// update here when the theme changes. The one exception is per-category
+// spending colors, which belong to the category and so live in
+// data/taxonomy.json; those are drawn from the same Heirloom family.
 export const CHART_PALETTE = ['#1e4d2b', '#b45309', '#2c7a7b', '#9b2c2c', '#6b8e4e', '#5b7fa6'];
 
-// Calm single-series trend color (e.g. cash reserve).
+// Calm single-series trend color (e.g. cash reserve), also the fallback for a
+// series with no color of its own.
 export const CHART_NEUTRAL = '#8a8266';
+
+/* Canvas mirrors of the semantic theme tokens, for the charts that encode
+   meaning rather than category: money up, money down, a supplementary
+   reference line, and the ink used for baselines and drawn-on labels. */
+export const CHART_SUCCESS = '#2f7a44'; // matches --p-success
+export const CHART_DANGER = '#b91c1c';  // matches --p-danger
+export const CHART_INFO = '#1f6f78';    // matches --p-info
+export const CHART_INK = '#2a2a20';     // matches --p-ink
+
+/**
+ * The current text color, for labels a plugin draws onto the canvas.
+ *
+ * Series colors are fixed hexes (above) because a data series must mean the
+ * same thing in either scheme. Drawn-on *text* is different: it is chrome, and
+ * chrome that stays ink-dark disappears against the dark theme's ground. This
+ * is safe to resolve here because plugins draw on every frame, so the value is
+ * re-read after a scheme change; CHART_INK is the fallback for SSR and for the
+ * canvas-in-a-detached-node case, where there is no computed style to read.
+ */
+export function chartInk(canvas?: HTMLCanvasElement | null): string {
+  if (typeof window === 'undefined') return CHART_INK;
+  const el = canvas ?? document.body;
+  const value = getComputedStyle(el).getPropertyValue('--color-text-base-default').trim();
+  return value || CHART_INK;
+}
 
 // Common chart options
 export const chartDefaults = {

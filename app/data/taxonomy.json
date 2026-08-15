@@ -5,7 +5,7 @@
       "id": "housing",
       "name": "Housing",
       "description": "All housing-related expenses including rent, mortgage, and home maintenance",
-      "color": "#4285f4",
+      "color": "#1e4d2b",
       "subcategories": [
         {
           "id": "rent",
@@ -49,7 +49,7 @@
       "id": "utilities",
       "name": "Utilities",
       "description": "Monthly utility bills and services",
-      "color": "#669df6",
+      "color": "#5b7fa6",
       "subcategories": [
         {
           "id": "electric",
@@ -93,7 +93,7 @@
       "id": "food",
       "name": "Food",
       "description": "All food and beverage purchases, whether groceries or dining out",
-      "color": "#0f9d58",
+      "color": "#b45309",
       "subcategories": [
         {
           "id": "grocery",
@@ -131,7 +131,7 @@
       "id": "transportation",
       "name": "Transportation",
       "description": "All transportation-related expenses",
-      "color": "#f9ab00",
+      "color": "#2c7a7b",
       "subcategories": [
         {
           "id": "fuel",
@@ -187,7 +187,7 @@
       "id": "healthcare",
       "name": "Healthcare",
       "description": "Medical and health-related expenses",
-      "color": "#d93025",
+      "color": "#9b2c2c",
       "subcategories": [
         {
           "id": "doctor",
@@ -225,7 +225,7 @@
       "id": "shopping",
       "name": "Shopping",
       "description": "General shopping and retail purchases",
-      "color": "#e91e63",
+      "color": "#876cad",
       "subcategories": [
         {
           "id": "clothing",
@@ -263,7 +263,7 @@
       "id": "entertainment",
       "name": "Entertainment",
       "description": "Entertainment, media, and recreational activities",
-      "color": "#9c27b0",
+      "color": "#96486e",
       "subcategories": [
         {
           "id": "streaming",
@@ -307,7 +307,7 @@
       "id": "travel",
       "name": "Travel",
       "description": "Travel and vacation expenses",
-      "color": "#00bcd4",
+      "color": "#1a4f66",
       "subcategories": [
         {
           "id": "flights",
@@ -339,7 +339,7 @@
       "id": "kids",
       "name": "Kids",
       "description": "Child-related expenses",
-      "color": "#ff9800",
+      "color": "#97a44e",
       "subcategories": [
         {
           "id": "childcare",
@@ -377,7 +377,7 @@
       "id": "pets",
       "name": "Pets",
       "description": "Pet-related expenses",
-      "color": "#8bc34a",
+      "color": "#4f7a3c",
       "subcategories": [
         {
           "id": "food",
@@ -409,7 +409,7 @@
       "id": "personal-care",
       "name": "Personal Care",
       "description": "Personal care and wellness expenses",
-      "color": "#00acc1",
+      "color": "#c08fa0",
       "subcategories": [
         {
           "id": "haircut",
@@ -441,7 +441,7 @@
       "id": "education",
       "name": "Education",
       "description": "Education and learning expenses",
-      "color": "#3f51b5",
+      "color": "#35437c",
       "subcategories": [
         {
           "id": "tuition",
@@ -473,7 +473,7 @@
       "id": "gifts-donations",
       "name": "Gifts & Donations",
       "description": "Gifts, charity, and donations",
-      "color": "#e91e63",
+      "color": "#8c6d1f",
       "subcategories": [
         {
           "id": "gifts",
@@ -499,7 +499,7 @@
       "id": "financial",
       "name": "Financial",
       "description": "Banking, fees, and financial services",
-      "color": "#607d8b",
+      "color": "#67546b",
       "subcategories": [
         {
           "id": "bank-fees",
@@ -531,7 +531,7 @@
       "id": "taxes",
       "name": "Taxes",
       "description": "Income taxes, tax payments, refunds, and tax-related expenses",
-      "color": "#795548",
+      "color": "#5f4b38",
       "subcategories": [
         {
           "id": "income-tax-payment",
@@ -569,7 +569,7 @@
       "id": "income",
       "name": "Income",
       "description": "Income and money received",
-      "color": "#0f9d58",
+      "color": "#2f7a44",
       "subcategories": [
         {
           "id": "salary",
@@ -601,7 +601,7 @@
       "id": "transfer",
       "name": "Transfer",
       "description": "Transfers between accounts",
-      "color": "#9aa0a6",
+      "color": "#8a8266",
       "subcategories": [
         {
           "id": "between-accounts",
@@ -641,7 +641,7 @@
       "id": "other",
       "name": "Other",
       "description": "Uncategorized transactions",
-      "color": "#78909c",
+      "color": "#a9a28c",
       "subcategories": [
         {
           "id": "uncategorized",

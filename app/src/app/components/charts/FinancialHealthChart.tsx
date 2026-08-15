@@ -4,16 +4,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import type { ChartOptions, ScriptableContext, TooltipItem } from 'chart.js';
 import '@/lib/chartConfig';
-import { formatCurrency, formatMonth, formatPercent } from '@/lib/chartConfig';
+import {
+  formatCurrency,
+  formatMonth,
+  formatPercent,
+  CHART_SUCCESS,
+  CHART_DANGER,
+  CHART_INFO,
+} from '@/lib/chartConfig';
 import { monthlyExpenseTotals, monthlyIncomeTotals } from '@/lib/spending';
 import type { DateRange, Transaction } from '@/types';
 
-// Palette convention shared with PortfolioTrendChart (see globals.css design
-// tokens): brand green for income, critical red for spending, info blue for
-// the investment return line.
-const INCOME_COLOR = '#0f9d58';
-const SPENDING_COLOR = '#d93025';
-const RETURN_COLOR = '#4285f4';
+// Palette convention shared with PortfolioTrendChart (see chartConfig.ts, which
+// mirrors the globals.css theme tokens onto the canvas): success green for
+// income, critical red for spending, info teal for the investment return line.
+const INCOME_COLOR = CHART_SUCCESS;
+const SPENDING_COLOR = CHART_DANGER;
+const RETURN_COLOR = CHART_INFO;
 
 interface GainPoint {
   month: string; // YYYY-MM

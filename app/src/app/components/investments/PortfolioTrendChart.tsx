@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import type { ChartOptions } from 'chart.js';
 import '@/lib/chartConfig';
-import { formatCurrency, formatPercent, CHART_PALETTE } from '@/lib/chartConfig';
+import { formatCurrency, formatPercent, CHART_PALETTE, CHART_INK } from '@/lib/chartConfig';
 import type { AllocNode } from '@/lib/investments/allocation';
 import type { AllocationBasis } from '@/lib/investments/periods';
 import {
@@ -22,7 +22,7 @@ const LEVEL_COUNT = LEVEL_LABELS.length;
 // Baseline "total" line is pinned to the ink color; the category series use the
 // shared Heirloom chart palette (see chartConfig.ts) so charts read as part of
 // the same theme as the rest of the app.
-const TOTAL_COLOR = '#2a2a20'; // matches --p-ink
+const TOTAL_COLOR = CHART_INK;
 const PALETTE = CHART_PALETTE;
 
 const PERIOD_WORD: Record<AllocationBasis, string> = {

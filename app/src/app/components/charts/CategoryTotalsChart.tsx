@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import type { ChartOptions, Plugin, TooltipItem } from 'chart.js';
 import '@/lib/chartConfig';
-import { formatCurrency } from '@/lib/chartConfig';
+import { formatCurrency, chartInk, CHART_NEUTRAL } from '@/lib/chartConfig';
 import type { Transaction, Category } from '@/types';
 import { NON_SPENDING_CATEGORIES, expenseAmount, expenseCategoryId } from '@/lib/spending';
 
@@ -100,7 +100,7 @@ export default function CategoryTotalsChart({
     const datasets = Array.from(allSubcategories.entries()).map(
       ([key, { categoryId, subcategoryId, name }]) => {
         const category = categoryMap.get(categoryId);
-        const baseColor = category?.color || '#78909c';
+        const baseColor = category?.color || CHART_NEUTRAL;
 
         const catSubs = Object.keys(categoryTotals[categoryId].subcategories);
         const subIdx = catSubs.indexOf(key.split('/')[1]);
@@ -142,7 +142,7 @@ export default function CategoryTotalsChart({
         if (!xScale || !yScale) return;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(60, 64, 67, 0.95)';
+        ctx.fillStyle = chartInk(chart.canvas);
         ctx.font = '600 11px Inter, system-ui, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
