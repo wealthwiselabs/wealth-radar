@@ -16,7 +16,9 @@ A self-hosted personal finance app to help you track and hopefully reduce your s
 | -------------------------------------------------- | ------------------------------------------ | -------------------------------------- |
 | ![Transactions](app/docs/screenshots/transactions.png) | ![Accounts](app/docs/screenshots/accounts.png) | ![Sign in](app/docs/screenshots/login.png) |
 
-<sub>All screenshots use fake demo data.</sub>
+<sub>All screenshots use fake demo data. To refresh them after a UI change, run `npm run screenshots`
+from `app/` — it rebuilds the demo dataset and recaptures the dashboard shots. It never reads or
+writes your real database.</sub>
 
 ## Stack
 
