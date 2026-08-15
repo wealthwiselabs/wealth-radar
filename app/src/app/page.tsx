@@ -123,10 +123,23 @@ export default function Home() {
     if (dateRange.startDate) params.append('startDate', dateRange.startDate);
     if (dateRange.endDate) params.append('endDate', dateRange.endDate);
 
-    const res = await fetch(`/api/transactions?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setTransactions(data.transactions);
+    // Both callers below fire this and walk away, so a rejection here has
+    // nowhere to go — it surfaces as an unhandled rejection (the dev overlay's
+    // "TypeError: Failed to fetch"). That is the normal case, not an exotic
+    // one: this runs when the tab regains focus, which is exactly when the
+    // machine has just woken or the dev server is mid-restart.
+    //
+    // Keep whatever is already on screen. This is a background refresh the
+    // user did not ask for, so a transient blip must not blank the page —
+    // stale rows beat empty ones, and the next focus or sync retries.
+    try {
+      const res = await fetch(`/api/transactions?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTransactions(data.transactions);
+      }
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
     }
   }, [dateRange]);
 
