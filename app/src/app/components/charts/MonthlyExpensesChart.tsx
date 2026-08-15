@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import type { ChartOptions, Plugin } from 'chart.js';
 import '@/lib/chartConfig';
-import { formatCurrency, formatMonth } from '@/lib/chartConfig';
+import { formatCurrency, formatMonth, chartInk } from '@/lib/chartConfig';
 import type { Transaction, Category } from '@/types';
 import { NON_SPENDING_CATEGORIES, expenseAmount, expenseCategoryId } from '@/lib/spending';
 
@@ -79,7 +79,7 @@ export default function MonthlyExpensesChart({
         if (!yScale || !xScale) return;
 
         ctx.save();
-        ctx.fillStyle = 'rgba(60, 64, 67, 0.95)';
+        ctx.fillStyle = chartInk(chart.canvas);
         ctx.font = '600 11px Inter, system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';

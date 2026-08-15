@@ -313,7 +313,7 @@ export default function TransactionsTable({
                     className="origin-select w-full"
                     style={{
                       borderLeftWidth: '3px',
-                      borderLeftColor: cat?.category.color || '#ccc',
+                      borderLeftColor: cat?.category.color || 'var(--color-border-base-hover)',
                     }}
                   >
                     {categories.map((c) => (

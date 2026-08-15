@@ -242,7 +242,7 @@ export default function RulePreviewModal({
             <select
               aria-label="Category"
               className="origin-select text-small"
-              style={{ borderLeftWidth: '3px', borderLeftColor: category?.color || '#ccc' }}
+              style={{ borderLeftWidth: '3px', borderLeftColor: category?.color || 'var(--color-border-base-hover)' }}
               value={catId}
               onChange={(e) => changeCategory(e.target.value)}
             >

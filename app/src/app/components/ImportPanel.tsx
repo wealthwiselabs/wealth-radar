@@ -199,7 +199,7 @@ export default function ImportPanel({ categories, onImported, children }: Import
                             className="origin-select w-full"
                             style={{
                               borderLeftWidth: '3px',
-                              borderLeftColor: cat?.color || '#ccc',
+                              borderLeftColor: cat?.color || 'var(--color-border-base-hover)',
                             }}
                           >
                             {categories.map((c) => (
