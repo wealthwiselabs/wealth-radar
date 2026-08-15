@@ -3,9 +3,11 @@
 out/
 public/
 
-# Playwright's isolated Next.js build dir (see NEXT_DIST_DIR in
-# playwright.config.ts) — never the same as .next/, see the comment there.
+# Playwright's isolated Next.js build dirs (see NEXT_DIST_DIR in
+# playwright.config.ts / playwright.screenshots.config.ts) — never the same as
+# .next/, see the comment there.
 .next-e2e/
+.next-demo/
 
 # Dependencies
 node_modules/
@@ -56,6 +58,12 @@ data/snapshots/
 # own directory (never data/ itself) so they can never be confused with, or
 # overwrite, the real app.db / preferences.json.
 data/e2e/
+
+# Same arrangement for the generated README-screenshot data (scripts/seed-demo.ts).
+# It is fake, but it lives outside data/ for the same reason as e2e/: so that
+# rebuilding it can never reach the real app.db or preferences.json.
+data/demo/
+
 test-results/
 playwright-report/
 .next-verify/

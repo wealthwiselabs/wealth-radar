@@ -39,7 +39,7 @@ jobs:
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
-      github.repository == 'wealthwiselabs/expense-tracker'
+      github.repository == 'wealthwiselabs/wealth-radar'
     runs-on: ubuntu-latest
     concurrency:
       group: fly-deploy
