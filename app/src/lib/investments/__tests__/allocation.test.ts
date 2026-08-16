@@ -421,6 +421,27 @@ describe('look-through ROI (exchanges as class flows)', () => {
     if (mm.roi.kind === 'ok') expect(mm.roi.value).toBeCloseTo(0, 1); // net flows ≈ Δ, so ~0 not −11%
   });
 
+  it('suppresses cash-equivalent ROI when partial sweep data yields an impossible return', () => {
+    // The live-app bug: a settlement "Cash" position swept from $723 down to $44
+    // as cash left to settle purchases, but only an inflow (+427) was captured as
+    // an exchange — the outflows never posted as sells. The captured flows don't
+    // reconcile with the value change, so Modified Dietz reports −118%, a return
+    // no cash instrument can have. Having *some* exchange data slips it past the
+    // no-data guard, so it must be caught as unreconciled instead of displayed.
+    const tags = new Map([['sCash', t({ assetType: 'cash' })]]);
+    const snaps = [
+      rsnap('a1', '2025-12-31', [{ securityId: 'sCash', value: 723 }]),
+      rsnap('a1', '2026-07-31', [{ securityId: 'sCash', value: 44 }]),
+    ];
+    const ctx = rangeCtx(snaps, [], tags);
+    ctx.exchanges = [
+      { accountId: 'a1', securityId: 'sCash', date: '2026-04-20', amount: 427, type: 'buy', name: 'PURCHASE INTO CORE ACCOUNT' },
+    ];
+    const tree = buildAllocationWindowTree(ctx, '2026-01-01', '2026-08-07');
+    const cash = tree.children.find((c) => c.label === 'Cash')!;
+    expect(cash.roi.kind).toBe('missing'); // not a confidently-wrong −118%
+  });
+
   it('still suppresses cash-equivalent ROI when there is no transaction data (pro-rata only)', () => {
     const tags = new Map([['sMM', t({ assetType: 'money_market' })]]);
     const snaps = [
