@@ -47,8 +47,8 @@ writes your real database.</sub>
 ## Quick start
 
 ```bash
-git clone <your-fork-url> expense-tracker
-cd expense-tracker/app
+git clone <your-fork-url> wealth-radar
+cd wealth-radar/app
 npm install
 cp .env.example .env.local     # then edit .env.local (see Configuration)
 npm run db:migrate             # create the SQLite database

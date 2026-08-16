@@ -114,4 +114,4 @@ TDD: write the failing test, watch it fail, then implement. Unit tests live in
 
 ## Git
 
-Remote is GitHub (`wealthwiselabs/expense-tracker`). Commit only when asked.
+Remote is GitHub (`wealthwiselabs/wealth-radar`). Commit only when asked.

@@ -658,7 +658,7 @@ Respond with JSON only:
 ## File Structure
 
 ```
-expense-tracker/
+wealth-radar/
 ├── src/
 │   ├── app/
 │   │   ├── api/

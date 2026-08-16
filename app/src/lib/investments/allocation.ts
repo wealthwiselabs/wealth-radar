@@ -314,6 +314,15 @@ function accumulate(ctx: AllocContext, period: AllocationPeriod, targets: readon
            bucketT0, bucketT1, bucketHasData: buckets.length > 0 };
 }
 
+// A cash-equivalent (money market / settlement cash) cannot realistically post a
+// return anywhere near this magnitude over one window — real yields are a few
+// percent. A larger |ROI| means the buy/sell sweeps didn't net (partial
+// transaction data: an inflow posted but the matching outflow never did, or vice
+// versa), so Modified Dietz is measuring unrecorded cash movement as gain/loss,
+// not return. Past this bound the figure is a data artifact (the live −118% Cash
+// row), so it is suppressed as unreconciled rather than shown as fact.
+const CASH_EQUIV_MAX_PLAUSIBLE_ABS_ROI = 0.5;
+
 const TOP_ORDER = ['Stock', 'Bond', 'Money market', 'Cash', 'Insurance', 'Unclassified'];
 const STOCK_ORDER = ['US', 'International', 'Individual Stocks'];
 const US_ORDER = ['Large Cap', 'Mid Cap', 'Small Cap', 'Sector: Tech', 'Sector: REIT', 'Unclassified'];
@@ -551,10 +560,20 @@ export function buildAllocationTree(
         : modifiedDietz(s, e as number, flows, bucketT0, bucketT1);
     }
     // Cash-equivalents (money market, cash): a Modified-Dietz "return" is only
-    // meaningful when we have the buy/sell exchanges that net out the cash sweeps.
-    // Without transaction data for that class (pro-rata only), suppress it (tile —).
-    if ((path[0] === 'Money market' || path[0] === 'Cash') && !exchangePaths.has(key)) {
-      roi = { kind: 'missing', reason: 'cash-equivalent — no transaction data to net cash sweeps' };
+    // meaningful when the buy/sell exchanges net out the cash sweeps. Two ways
+    // that fails, both suppressed to the tile's — rather than shown as fact:
+    //   1. No transaction data for the class at all (pro-rata only) — nothing to
+    //      net the sweeps against.
+    //   2. Partial transaction data that doesn't reconcile: enough exchange rows
+    //      to clear guard (1), but the captured flows disagree with the value
+    //      change badly enough to push |ROI| past what a cash instrument can
+    //      actually return. That's unrecorded sweeps, not a real gain/loss.
+    if (path[0] === 'Money market' || path[0] === 'Cash') {
+      if (!exchangePaths.has(key)) {
+        roi = { kind: 'missing', reason: 'cash-equivalent — no transaction data to net cash sweeps' };
+      } else if (roi.kind === 'ok' && Math.abs(roi.value) > CASH_EQUIV_MAX_PLAUSIBLE_ABS_ROI) {
+        roi = { kind: 'missing', reason: 'cash-equivalent — sweep transactions don’t reconcile with the value change' };
+      }
     }
     const kids = childrenOf(path)
       .map((label) => makeNode([...path, label]))
