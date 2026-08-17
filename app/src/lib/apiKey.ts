@@ -18,3 +18,24 @@ export function setStoredApiKey(key: string): void {
     window.localStorage.removeItem(STORAGE_KEY);
   }
 }
+
+// Provider-scoped headers for the agent chat endpoint. Generalizes the single
+// Anthropic API key above into a small set of `x-agent-*` headers so the
+// agent can be pointed at other providers/models/base URLs via localStorage,
+// while the underlying stored key (and its existing helpers) stay unchanged.
+export function getAgentKeyHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  const provider = window.localStorage.getItem('wealthwise:agent-provider') || 'anthropic';
+  const model =
+    window.localStorage.getItem('wealthwise:agent-model') ||
+    (provider === 'anthropic' ? 'claude-sonnet-5' : 'gpt-5.6');
+  const headers: Record<string, string> = {
+    'x-agent-provider': provider,
+    'x-agent-model': model,
+  };
+  const key = getStoredApiKey();
+  if (key) headers['x-agent-api-key'] = key;
+  const baseURL = window.localStorage.getItem('wealthwise:agent-base-url');
+  if (baseURL) headers['x-agent-base-url'] = baseURL;
+  return headers;
+}

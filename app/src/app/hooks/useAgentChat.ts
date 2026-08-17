@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useRef, useState } from 'react';
-import { getStoredApiKey } from '@/lib/apiKey';
+import { getAgentKeyHeaders } from '@/lib/apiKey';
 
 // Splits an SSE byte stream on the `\n\n` frame delimiter and JSON-parses each
 // `data: ` line. Pure so it can be unit-tested without a fetch/ReadableStream
@@ -32,7 +32,7 @@ export function useAgentChat() {
     try {
       const res = await fetch('/api/agent/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-agent-api-key': getStoredApiKey() },
+        headers: { 'Content-Type': 'application/json', ...getAgentKeyHeaders() },
         body: JSON.stringify({ conversationId: convId.current, message: text }),
       });
       if (!res.ok) {
