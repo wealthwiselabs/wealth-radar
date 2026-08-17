@@ -29,31 +29,49 @@ export function useAgentChat() {
   const send = useCallback(async (text: string) => {
     setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
     setStreaming(true);
-    const res = await fetch('/api/agent/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-agent-api-key': getStoredApiKey() },
-      body: JSON.stringify({ conversationId: convId.current, message: text }),
-    });
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const { events, rest } = parseSSEChunk(buf);
-      buf = rest;
-      for (const e of events) {
-        if (e.type === 'conversation') convId.current = e.conversationId;
-        else if (e.type === 'text')
-          setMessages((m) => {
-            const c = [...m];
-            c[c.length - 1] = { role: 'assistant', text: c[c.length - 1].text + e.delta };
-            return c;
-          });
+    try {
+      const res = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-agent-api-key': getStoredApiKey() },
+        body: JSON.stringify({ conversationId: convId.current, message: text }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        setMessages((m) => {
+          const c = [...m];
+          c[c.length - 1] = { role: 'assistant', text: `⚠️ ${errText || res.statusText}` };
+          return c;
+        });
+        return;
       }
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const { events, rest } = parseSSEChunk(buf);
+        buf = rest;
+        for (const e of events) {
+          if (e.type === 'conversation') convId.current = e.conversationId;
+          else if (e.type === 'text')
+            setMessages((m) => {
+              const c = [...m];
+              c[c.length - 1] = { role: 'assistant', text: c[c.length - 1].text + e.delta };
+              return c;
+            });
+        }
+      }
+    } catch {
+      setMessages((m) => {
+        const c = [...m];
+        c[c.length - 1] = { role: 'assistant', text: '⚠️ Something went wrong. Please try again.' };
+        return c;
+      });
+    } finally {
+      setStreaming(false);
     }
-    setStreaming(false);
   }, []);
 
   return { messages, streaming, send };
