@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import AppHeader from './components/AppHeader';
 import ThemeSync from './components/ThemeSync';
+import AgentWidget from './components/agent/AgentWidget';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 // Open fonts, self-hosted by next/font at build time (no external CDN):
@@ -52,6 +53,7 @@ export default function RootLayout({
         <ThemeSync />
         <AppHeader />
         {children}
+        <AgentWidget />
       </body>
     </html>
   );
