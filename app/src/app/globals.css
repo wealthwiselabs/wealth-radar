@@ -318,6 +318,14 @@ body {
   color: var(--color-text-base-disabled);
 }
 
+/* Hide the browser's native search clear button — we render our own styled
+   clear (×) so a type="search" input doesn't show two of them. */
+.origin-input[type='search']::-webkit-search-cancel-button,
+.origin-input[type='search']::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Origin Select Styles */
 .origin-select {
   font-family: var(--font-stack-inter);

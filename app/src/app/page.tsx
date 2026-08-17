@@ -15,6 +15,7 @@ import { useTimeRange } from './hooks/useTimeRange';
 import type { Preset } from '@/lib/timeRange';
 import type { Transaction, Category, DateRange } from '@/types';
 import { sumExpenses, sumIncome } from '@/lib/spending';
+import { searchTransactions } from '@/lib/transactionSearch';
 import { onDataChanged, notifyDataChanged } from '@/lib/dataEvents';
 import { useRefreshOnFocus } from './hooks/useRefreshOnFocus';
 
@@ -27,6 +28,9 @@ export default function Home() {
     categoryId: '',
     subcategoryId: '',
   });
+  // Kept separate from tableFilters so chart drill-downs and "Clear filters"
+  // don't wipe an in-progress search.
+  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   // Bumped after sync / account changes / new statements so the coverage grid + gaps badge refetch.
 
@@ -69,7 +73,24 @@ export default function Home() {
     []
   );
 
-  // Apply table-only filters (cat/subcat/drill-month) on top of the API-fetched window.
+  // Resolve category/subcategory IDs to their display names so search can match
+  // what the reader sees in the table, not the opaque IDs.
+  const searchLabels = useMemo(() => {
+    const catName = new Map<string, string>();
+    const subName = new Map<string, string>();
+    for (const c of categories) {
+      catName.set(c.id, c.name);
+      for (const s of c.subcategories) subName.set(s.id, s.name);
+    }
+    return {
+      category: (t: Transaction) => catName.get(t.categoryId) ?? '',
+      subcategory: (t: Transaction) => subName.get(t.subcategoryId) ?? '',
+    };
+  }, [categories]);
+
+  // Apply table-only filters (cat/subcat/drill-month) on top of the API-fetched
+  // window, then the keyword search — so search only ever narrows what the
+  // time-range and category filters have already scoped.
   const visibleTransactions = useMemo(() => {
     let out = transactions;
     if (tableFilters.month) {
@@ -81,8 +102,9 @@ export default function Home() {
     if (tableFilters.subcategoryId) {
       out = out.filter((t) => t.subcategoryId === tableFilters.subcategoryId);
     }
+    out = searchTransactions(out, search, searchLabels);
     return out;
-  }, [transactions, tableFilters]);
+  }, [transactions, tableFilters, search, searchLabels]);
 
   // Fetch transactions and taxonomy on mount
   useEffect(() => {
@@ -339,6 +361,8 @@ export default function Home() {
           filters={tableFilters}
           resultCount={visibleTransactions.length}
           onChange={setTableFilters}
+          search={search}
+          onSearchChange={setSearch}
         />
         {transactions.length > 0 && <ExportButton dateRange={dateRange} />}
       </div>
