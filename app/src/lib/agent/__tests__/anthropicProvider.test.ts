@@ -47,4 +47,20 @@ describe('AnthropicProvider', () => {
     expect(events).toContainEqual({ type: 'tool_call', id: 'tu_1', name: 'search_transactions', input: { q: 'amazon' } });
     expect(events.at(-1)).toEqual({ type: 'done', stopReason: 'tool_use' });
   });
+
+  it('requests adaptive thinking at high effort', async () => {
+    let params: any;
+    const client: AnthropicLike = {
+      messages: {
+        stream(p: unknown) {
+          params = p;
+          return { async *[Symbol.asyncIterator]() { yield { type: 'message_delta', delta: { stop_reason: 'end_turn' } }; } };
+        },
+      },
+    };
+    const provider = createAnthropicProvider({ apiKey: 'k', client });
+    await collect(provider.streamChat({ system: 's', messages: [], tools: [], model: 'claude-sonnet-5' }));
+    expect(params.thinking).toEqual({ type: 'adaptive' });
+    expect(params.output_config).toEqual({ effort: 'high' });
+  });
 });

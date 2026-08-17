@@ -35,7 +35,10 @@ export function createAnthropicProvider(opts: { apiKey: string; client?: Anthrop
       const stream = client.messages.stream({
         model: req.model,
         max_tokens: 8192,
+        // Adaptive thinking + high effort: the model decides when to think, and
+        // effort 'high' sets the depth (the 5-series removed budget_tokens).
         thinking: { type: 'adaptive' },
+        output_config: { effort: 'high' },
         system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
         tools: toAnthropicTools(req.tools),
         messages: toAnthropicMessages(req.messages),
