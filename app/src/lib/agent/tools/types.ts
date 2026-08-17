@@ -21,6 +21,12 @@ export interface Tool {
   spec: ToolSpec;
   gate: Gate;
   run(input: any, ctx: ToolContext): Promise<ToolResult>;
+  /**
+   * Optional preview builder for a gated tool. The loop calls this (without
+   * running the tool) to describe the pending mutation to the user before they
+   * approve or deny it. Never performs the mutation.
+   */
+  preview?(input: any, ctx: ToolContext): Promise<{ title: string; diff: import('../ui').DiffView; confirmLabel: string }>;
 }
 
 export function toToolSpecs(tools: Tool[]): ToolSpec[] {

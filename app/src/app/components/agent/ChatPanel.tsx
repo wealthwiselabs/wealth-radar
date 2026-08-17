@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
 import { useAgentChat } from '@/app/hooks/useAgentChat';
+import Affordances from '@/app/components/agent/Affordances';
 
 export default function ChatPanel() {
-  const { messages, streaming, send } = useAgentChat();
+  const { messages, affordances, streaming, send, respond } = useAgentChat();
   const [draft, setDraft] = useState('');
   return (
     <div className="flex flex-col h-full">
@@ -15,6 +16,7 @@ export default function ChatPanel() {
             </span>
           </div>
         ))}
+        <Affordances affordances={affordances} respond={respond} disabled={streaming} />
       </div>
       <form
         className="p-2 border-t flex gap-2"

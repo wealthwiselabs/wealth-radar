@@ -1,12 +1,13 @@
 import { randomUUID } from 'crypto';
 import type { LLMProvider, AgentMessage } from './providers/types';
 import type { Tool, ToolContext } from './tools/types';
+import type { UIAffordance } from './ui';
 
 export type LoopEvent =
   | { type: 'text'; delta: string }
   | { type: 'thinking'; delta: string }
   | { type: 'tool_start'; name: string }
-  | { type: 'proposal'; token: string; toolName: string; input: unknown }
+  | { type: 'proposal'; token: string; toolName: string; input: unknown; affordance: UIAffordance }
   | { type: 'done' };
 
 export interface RunAgentOpts {
@@ -48,7 +49,17 @@ export async function* runAgent(opts: RunAgentOpts): AsyncIterable<LoopEvent> {
       if (!tool) { messages.push({ role: 'tool', toolResult: { id: call.id, content: `Unknown tool ${call.name}`, isError: true } }); continue; }
       if (tool.gate !== 'none') {
         // Gated: stop and hand the decision to the user. Do NOT mutate.
-        yield { type: 'proposal', token: randomUUID(), toolName: call.name, input: call.input };
+        const token = randomUUID();
+        const p = tool.preview
+          ? await tool.preview(call.input, opts.ctx)
+          : { title: `Confirm ${call.name}?`, diff: { summary: JSON.stringify(call.input) }, confirmLabel: 'Confirm' };
+        yield {
+          type: 'proposal',
+          token,
+          toolName: call.name,
+          input: call.input,
+          affordance: { kind: 'confirm', token, title: p.title, diff: p.diff, confirmLabel: p.confirmLabel },
+        };
         return;
       }
       yield { type: 'tool_start', name: call.name };
