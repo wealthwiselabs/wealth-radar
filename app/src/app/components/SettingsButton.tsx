@@ -32,6 +32,12 @@ const AGENT_PROVIDER_KEY = 'wealthwise:agent-provider';
 const AGENT_MODEL_KEY = 'wealthwise:agent-model';
 const AGENT_BASE_URL_KEY = 'wealthwise:agent-base-url';
 
+interface MemoryEntry {
+  key: string;
+  value: string;
+  updatedAt: string;
+}
+
 export default function SettingsButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [keyInput, setKeyInput] = useState('');
@@ -45,6 +51,8 @@ export default function SettingsButton() {
   const [agentProvider, setAgentProvider] = useState<AgentProvider>('anthropic');
   const [agentModel, setAgentModel] = useState('');
   const [agentBaseURL, setAgentBaseURL] = useState('');
+  const [memory, setMemory] = useState<MemoryEntry[]>([]);
+  const [memoryLoading, setMemoryLoading] = useState(false);
 
   useEffect(() => {
     setHasKey(!!getStoredApiKey());
@@ -60,6 +68,26 @@ export default function SettingsButton() {
     setAgentModel(window.localStorage.getItem(AGENT_MODEL_KEY) || '');
     setAgentBaseURL(window.localStorage.getItem(AGENT_BASE_URL_KEY) || '');
     setIsOpen(true);
+    setMemoryLoading(true);
+    fetch('/api/agent/memory')
+      .then((res) => res.json())
+      .then((data) => setMemory(data.memory || []))
+      .catch(() => setMemory([]))
+      .finally(() => setMemoryLoading(false));
+  };
+
+  // Deletes apply immediately — this section doesn't participate in Cancel/Save.
+  const forgetMemory = async (key: string) => {
+    setMemory((prev) => prev.filter((e) => e.key !== key));
+    try {
+      await fetch('/api/agent/memory', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+    } catch {
+      // Best-effort: a failed delete just means the entry may reappear next open.
+    }
   };
 
   // Preview immediately; persisted only on Save.
@@ -265,6 +293,43 @@ export default function SettingsButton() {
                 Chooses the model behind the chat assistant. Leave the base URL blank to use
                 the provider's default endpoint, or point it at an OpenAI-compatible or local
                 server.
+              </p>
+            </fieldset>
+
+            <hr className="my-[var(--space-6)] border-[var(--color-border-base-subdued)]" />
+
+            <fieldset>
+              <legend className="text-small font-medium text-[var(--color-text-base-default)] mb-[var(--space-2)]">
+                What the assistant remembers
+              </legend>
+              {memoryLoading ? (
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Loading&hellip;</p>
+              ) : memory.length === 0 ? (
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Nothing saved yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-[var(--space-2)]">
+                  {memory.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex items-start justify-between gap-[var(--space-2)] text-small"
+                    >
+                      <span className="text-[var(--color-text-base-default)]">
+                        <span className="font-medium">{entry.key}</span>: {entry.value}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => forgetMemory(entry.key)}
+                        className="origin-btn origin-btn-secondary shrink-0"
+                      >
+                        Forget
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
+                Facts the assistant has stored about you across conversations. Forgetting one
+                takes effect immediately.
               </p>
             </fieldset>
 
