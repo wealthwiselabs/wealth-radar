@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sseEncode, streamLoopToSSE } from '@/app/api/agent/chat/route';
+import { sseEncode, streamLoopToSSE } from '@/app/api/agent/chat/sse';
 import type { LoopEvent } from '@/lib/agent/loop';
 
 async function* loop(): AsyncIterable<LoopEvent> {

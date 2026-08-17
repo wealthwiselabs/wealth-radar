@@ -12,14 +12,7 @@ import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/a
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
 import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
 import type { AgentMessage } from '@/lib/agent/providers/types';
-
-export function sseEncode(event: unknown): string {
-  return `data: ${JSON.stringify(event)}\n\n`;
-}
-
-export async function* streamLoopToSSE(loop: AsyncIterable<LoopEvent>): AsyncIterable<string> {
-  for await (const e of loop) yield sseEncode(e);
-}
+import { sseEncode } from './sse';
 
 function toAgentMessages(stored: { role: string; content: any }[]): AgentMessage[] {
   return stored.map((m) => ({
