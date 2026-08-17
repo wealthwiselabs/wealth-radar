@@ -10,14 +10,14 @@ describe('shouldSyncOnStartup', () => {
   it('syncs when nothing has ever synced', () => {
     expect(shouldSyncOnStartup(null, NOW)).toBe(true);
   });
-  it('skips when the last sync is under 12h old', () => {
-    expect(shouldSyncOnStartup('2026-08-10T01:00:00.000Z', NOW)).toBe(false); // 11h
+  it('skips when the last sync is under 24h old', () => {
+    expect(shouldSyncOnStartup('2026-08-09T13:00:00.000Z', NOW)).toBe(false); // 23h
   });
-  it('syncs when the last sync is over 12h old', () => {
-    expect(shouldSyncOnStartup('2026-08-09T23:00:00.000Z', NOW)).toBe(true); // 13h
+  it('syncs when the last sync is over 24h old', () => {
+    expect(shouldSyncOnStartup('2026-08-09T11:00:00.000Z', NOW)).toBe(true); // 25h
   });
-  it('treats exactly 12h as due (boundary belongs to sync)', () => {
-    expect(shouldSyncOnStartup('2026-08-10T00:00:00.000Z', NOW)).toBe(true);
+  it('treats exactly 24h as due (boundary belongs to sync)', () => {
+    expect(shouldSyncOnStartup('2026-08-09T12:00:00.000Z', NOW)).toBe(true);
   });
   it('honors a custom threshold', () => {
     expect(shouldSyncOnStartup('2026-08-10T10:00:00.000Z', NOW, 1)).toBe(true); // 2h > 1h

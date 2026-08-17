@@ -1,0 +1,45 @@
+name: Daily refresh
+
+# Wakes the deployed app once a day so its Plaid sync runs even when nobody has
+# opened it. The app scales to zero on Fly (auto_stop_machines = "stop"), so the
+# in-process 24h timer almost never gets to fire. Instead, a scheduled HTTP hit
+# cold-starts the machine; instrumentation.ts runs on process boot and triggers
+# the sync when data is >= 24h stale (see shouldSyncOnStartup). A single ping is
+# all we need — we rely on the cold start, not on any authenticated endpoint, so
+# no app credentials live here.
+
+on:
+  schedule:
+    # 09:17 UTC daily. The offset from :00 dodges the top-of-hour cron congestion
+    # that makes GitHub delay (or drop) scheduled runs. Adjust to taste.
+    - cron: '17 9 * * *'
+  workflow_dispatch: {}   # allow a manual "refresh now" from the Actions tab
+
+jobs:
+  wake:
+    # Only the canonical repo holds the APP_URL secret; forks and clones no-op
+    # rather than pinging someone else's deployment.
+    if: github.repository == 'wealthwiselabs/wealth-radar'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the app to wake it and trigger the on-boot sync
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "APP_URL secret is not set — nothing to ping. Skipping."
+            exit 0
+          fi
+          # A 401 from the login gate still cold-starts the machine, which is the
+          # whole point, so we do NOT use `curl -f`. Fly holds the request open
+          # while the machine boots; --retry rides out any cold-start hiccups.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --retry 5 --retry-all-errors --retry-delay 10 --max-time 90 \
+            "$APP_URL" || echo "000")
+          echo "App responded with HTTP $code"
+          # Reachable (any HTTP response, incl. 401) means the machine is awake
+          # and register() has run. Only a total failure to connect is an error.
+          if [ "$code" = "000" ]; then
+            echo "::error::Could not reach $APP_URL — machine may not have started."
+            exit 1
+          fi
