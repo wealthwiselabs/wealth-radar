@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useRef, useState } from 'react';
 import { getAgentKeyHeaders } from '@/lib/apiKey';
+import { notifyDataChanged } from '@/lib/dataEvents';
 import type { UIAffordance } from '@/lib/agent/ui';
 
 // Splits an SSE byte stream on the `\n\n` frame delimiter and JSON-parses each
@@ -105,6 +106,10 @@ export function useAgentChat() {
           body: JSON.stringify({ conversationId: convId.current, action: { token, decision, value } }),
         });
         await consume(res);
+        // A gated write tool is the only thing that produces a confirm
+        // affordance, so an approved decision that streamed successfully
+        // means a mutation ran — refresh the main tables/charts.
+        if (res.ok && decision === 'approve') notifyDataChanged();
       } catch {
         setMessages((m) => {
           const c = [...m];
