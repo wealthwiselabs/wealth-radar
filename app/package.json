@@ -28,6 +28,7 @@
     "chart.js": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "next": "15.4.10",
+    "openai": "^7.4.0",
     "pdfjs-dist": "^4.0.0",
     "plaid": "^43.0.0",
     "react": "^19.0.1",

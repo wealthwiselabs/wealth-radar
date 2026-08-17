@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { runAgent, type LoopEvent } from '@/lib/agent/loop';
-import { createAnthropicProvider } from '@/lib/agent/providers/anthropic';
+import { createProvider } from '@/lib/agent/providers';
 import { readTools } from '@/lib/agent/tools/read';
 import { writeTools } from '@/lib/agent/tools/write';
 import { loadKnowledgeTool } from '@/lib/agent/tools/knowledge';
 import { makeSpawnTaskTool } from '@/lib/agent/tools/spawn';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
-import { buildSystemPrompt, resolveAgentConfig } from '@/lib/agent/systemPrompt';
+import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
 import type { AgentMessage } from '@/lib/agent/providers/types';
 
@@ -80,14 +80,14 @@ async function pumpLoop(
   if (assistantText) await appendMessage(conversationId, 'assistant', { text: assistantText }, db);
 }
 
-function newLoop(history: AgentMessage[], apiKey: string, model: string, db: ToolContext['db'], signal: AbortSignal) {
-  const provider = createAnthropicProvider({ apiKey });
+function newLoop(history: AgentMessage[], cfg: AgentConfig, db: ToolContext['db'], signal: AbortSignal) {
+  const provider = createProvider(cfg);
   return runAgent({
     provider,
-    model,
+    model: cfg.model,
     system: buildSystemPrompt(),
     messages: history,
-    tools: [...allTools, makeSpawnTaskTool({ provider, model })],
+    tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
     ctx: { db },
     signal,
   });
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg.apiKey!, cfg.model, db, req.signal), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg.apiKey!, cfg.model, db, req.signal), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }
