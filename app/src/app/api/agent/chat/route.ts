@@ -3,6 +3,7 @@ import { getDb } from '@/db/client';
 import { runAgent, type LoopEvent } from '@/lib/agent/loop';
 import { createAnthropicProvider } from '@/lib/agent/providers/anthropic';
 import { readTools } from '@/lib/agent/tools/read';
+import { writeTools } from '@/lib/agent/tools/write';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
 import { buildSystemPrompt, resolveAgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
@@ -28,7 +29,7 @@ function toAgentMessages(stored: { role: string; content: any }[]): AgentMessage
 // The single registry of tools the route exposes to the agent. Task 11 appends
 // gated write tools here; keeping it as one list means that change is one line
 // and the approve path below resolves any tool by name.
-const allTools: Tool[] = [...readTools];
+const allTools: Tool[] = [...readTools, ...writeTools];
 const byName = new Map(allTools.map((t) => [t.spec.name, t]));
 
 // Proposals that are awaiting an explicit approve/deny. A gated tool's `run`
