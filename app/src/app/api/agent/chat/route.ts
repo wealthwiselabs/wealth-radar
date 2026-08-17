@@ -5,6 +5,7 @@ import { createAnthropicProvider } from '@/lib/agent/providers/anthropic';
 import { readTools } from '@/lib/agent/tools/read';
 import { writeTools } from '@/lib/agent/tools/write';
 import { loadKnowledgeTool } from '@/lib/agent/tools/knowledge';
+import { makeSpawnTaskTool } from '@/lib/agent/tools/spawn';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
 import { buildSystemPrompt, resolveAgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
@@ -86,7 +87,7 @@ function newLoop(history: AgentMessage[], apiKey: string, model: string, db: Too
     model,
     system: buildSystemPrompt(),
     messages: history,
-    tools: allTools,
+    tools: [...allTools, makeSpawnTaskTool({ provider, model })],
     ctx: { db },
     signal,
   });
