@@ -7,18 +7,24 @@ import type { PlaidApi } from 'plaid';
 
 type Db = ReturnType<typeof getDb>;
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+const AUTO_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Should the app sync at startup? Yes when it has never synced, or when the
  * newest sync is at least `thresholdHours` old. The boundary (exactly the
  * threshold) counts as due — a run landing precisely on the cadence should
  * sync, not skip.
+ *
+ * The default is 24h (daily). The app scales to zero on Fly, so this on-boot
+ * check — not the in-process interval — is what actually keeps data fresh: a
+ * daily external ping (GitHub Actions `daily-refresh`, or the Mac backup's
+ * `fly machine start`) cold-starts the process, and this fires the sync when a
+ * day has passed.
  */
 export function shouldSyncOnStartup(
   lastSyncedAt: string | null,
   now: Date,
-  thresholdHours = 12,
+  thresholdHours = 24,
 ): boolean {
   if (!lastSyncedAt) return true;
   const elapsed = now.getTime() - new Date(lastSyncedAt).getTime();
@@ -39,9 +45,9 @@ export function newestSyncedAt(db: Db = getDb()): string | null {
   return values.sort().at(-1)!;   // ISO-8601 sorts lexicographically by time
 }
 
-// TWELVE_HOURS_MS is used by the scheduler (Task 3) via the interval; exported
-// so the interval and this module share one source of truth.
-export { TWELVE_HOURS_MS };
+// Used by the scheduler (instrumentation.ts) via the interval; exported so the
+// interval and this module share one source of truth for the daily cadence.
+export { AUTO_SYNC_INTERVAL_MS };
 
 export interface AutoSyncDeps {
   syncExpenses?: (db?: Db) => Promise<unknown>;

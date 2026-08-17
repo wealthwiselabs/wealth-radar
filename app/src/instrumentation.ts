@@ -11,16 +11,19 @@ export async function register() {
     const { runMigrations } = await import('./db/migrate');
     runMigrations();
 
-    const { runAutoSync, shouldSyncOnStartup, newestSyncedAt, TWELVE_HOURS_MS } =
+    const { runAutoSync, shouldSyncOnStartup, newestSyncedAt, AUTO_SYNC_INTERVAL_MS } =
       await import('./lib/plaid/autoSync');
 
     // Armed defensively, before the guarded startup sync below: if the startup
     // guard's own evaluation throws (e.g. newestSyncedAt() hits a DB error), the
     // recurring sync must not be silently disabled for the rest of the process.
-    // Every 12h for the life of the process. runAutoSync's mutex makes a tick that
-    // lands on a still-running startup sync a no-op rather than a double run. The
-    // interval is intentionally never cleared — it lives as long as the process.
-    setInterval(() => { void runAutoSync(); }, TWELVE_HOURS_MS);
+    // Every 24h for the life of the process. On Fly the app scales to zero, so
+    // this interval rarely gets to fire — the on-boot startup sync below is the
+    // real workhorse; the interval only matters when the process stays up long.
+    // runAutoSync's mutex makes a tick that lands on a still-running startup sync
+    // a no-op rather than a double run. The interval is intentionally never
+    // cleared — it lives as long as the process.
+    setInterval(() => { void runAutoSync(); }, AUTO_SYNC_INTERVAL_MS);
 
     // Startup sync, guarded and fire-and-forget. Guarded so frequent dev restarts
     // (and a boot minutes after a manual sync) don't re-hit Plaid; fire-and-forget
