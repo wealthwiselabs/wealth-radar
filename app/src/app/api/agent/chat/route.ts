@@ -6,9 +6,11 @@ import { readTools } from '@/lib/agent/tools/read';
 import { writeTools } from '@/lib/agent/tools/write';
 import { loadKnowledgeTool } from '@/lib/agent/tools/knowledge';
 import { makeSpawnTaskTool } from '@/lib/agent/tools/spawn';
+import { saveMemoryTool } from '@/lib/agent/tools/memory';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
 import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
+import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
 import type { AgentMessage } from '@/lib/agent/providers/types';
 
 export function sseEncode(event: unknown): string {
@@ -31,7 +33,7 @@ function toAgentMessages(stored: { role: string; content: any }[]): AgentMessage
 // The single registry of tools the route exposes to the agent. Task 11 appends
 // gated write tools here; keeping it as one list means that change is one line
 // and the approve path below resolves any tool by name.
-const allTools: Tool[] = [...readTools, ...writeTools, loadKnowledgeTool];
+const allTools: Tool[] = [...readTools, ...writeTools, loadKnowledgeTool, saveMemoryTool];
 const byName = new Map(allTools.map((t) => [t.spec.name, t]));
 
 // Proposals that are awaiting an explicit approve/deny. A gated tool's `run`
@@ -90,12 +92,18 @@ async function pumpLoop(
   }
 }
 
-function newLoop(history: AgentMessage[], cfg: AgentConfig, db: ToolContext['db'], signal: AbortSignal) {
+function newLoop(
+  history: AgentMessage[],
+  cfg: AgentConfig,
+  db: ToolContext['db'],
+  signal: AbortSignal,
+  memoryText: string,
+) {
   const provider = createProvider(cfg);
   return runAgent({
     provider,
     model: cfg.model,
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(memoryText),
     messages: history,
     tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
     ctx: { db },
@@ -108,6 +116,7 @@ export async function POST(req: NextRequest) {
   const cfg = resolveAgentConfig(req.headers, process.env as Record<string, string | undefined>);
   if (!cfg.apiKey) return new Response('No API key configured', { status: 401 });
   const db = getDb();
+  const memoryText = formatMemoryForPrompt(await getAllMemory(db));
 
   const sseHeaders = {
     'Content-Type': 'text/event-stream',
@@ -168,7 +177,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -208,7 +217,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }
