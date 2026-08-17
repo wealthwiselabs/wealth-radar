@@ -58,26 +58,36 @@ async function pumpLoop(
   db: ToolContext['db'],
 ): Promise<void> {
   let assistantText = '';
-  for await (const e of loop) {
-    if (e.type === 'text') assistantText += e.delta;
-    if (e.type === 'proposal') {
-      // Persist ONE assistant turn combining any prose that preceded the tool
-      // call with the tool call itself — matching the loop's own message shape.
-      // Splitting these into two consecutive assistant rows would break resume:
-      // the Anthropic API rejects non-alternating same-role messages.
-      await appendMessage(
-        conversationId,
-        'assistant',
-        { text: assistantText || undefined, toolCalls: [{ id: e.token, name: e.toolName, input: e.input }] },
-        db,
-      );
-      pending.set(e.token, { toolName: e.toolName, input: e.input, conversationId });
+  try {
+    for await (const e of loop) {
+      if (e.type === 'text') assistantText += e.delta;
+      if (e.type === 'proposal') {
+        // Persist ONE assistant turn combining any prose that preceded the tool
+        // call with the tool call itself — matching the loop's own message shape.
+        // Splitting these into two consecutive assistant rows would break resume:
+        // the Anthropic API rejects non-alternating same-role messages.
+        await appendMessage(
+          conversationId,
+          'assistant',
+          { text: assistantText || undefined, toolCalls: [{ id: e.token, name: e.toolName, input: e.input }] },
+          db,
+        );
+        pending.set(e.token, { toolName: e.toolName, input: e.input, conversationId });
+        controller.enqueue(encoder.encode(sseEncode(e)));
+        return;
+      }
       controller.enqueue(encoder.encode(sseEncode(e)));
-      return;
     }
-    controller.enqueue(encoder.encode(sseEncode(e)));
+    if (assistantText) await appendMessage(conversationId, 'assistant', { text: assistantText }, db);
+  } catch (err: any) {
+    // A provider throw mid-stream (network, bad model id, a malformed-history
+    // 400) would otherwise unwind into the ReadableStream's `start()`, whose
+    // `finally` only closes the stream — the response is already `200`, so the
+    // client sees a clean EOF and no error. Persist whatever text accumulated,
+    // then signal the failure explicitly so the hook can surface it.
+    if (assistantText) await appendMessage(conversationId, 'assistant', { text: assistantText }, db);
+    controller.enqueue(encoder.encode(sseEncode({ type: 'error', message: String(err?.message ?? err) })));
   }
-  if (assistantText) await appendMessage(conversationId, 'assistant', { text: assistantText }, db);
 }
 
 function newLoop(history: AgentMessage[], cfg: AgentConfig, db: ToolContext['db'], signal: AbortSignal) {
@@ -169,7 +179,28 @@ export async function POST(req: NextRequest) {
 
   // --- Initial-message path: a new user turn. ---
   const conversationId: string = body.conversationId || (await createConversation('', db));
-  if (body.message) await appendMessage(conversationId, 'user', { text: body.message }, db);
+  if (body.message) {
+    // If the user ignored a confirm card and just typed a new message, the last
+    // stored assistant turn is a dangling tool_use (the parked proposal) with no
+    // matching tool_result. Appending a user turn onto that produces
+    // assistant(tool_use) → user(text), which BOTH the Anthropic and OpenAI APIs
+    // reject — wedging every subsequent turn until a page reload. Auto-resolve
+    // any proposals parked for THIS conversation with a synthetic tool_result
+    // BEFORE appending the user turn, so the history stays well-formed
+    // (assistant(tool_use) → tool(result) → user(text)). The explicit approve/deny
+    // path above consumes its own token, so this only ever fires for abandoned cards.
+    for (const [token, p] of pending) {
+      if (p.conversationId !== conversationId) continue;
+      await appendMessage(
+        conversationId,
+        'tool',
+        { toolResult: { id: token, content: 'User moved on without confirming.', isError: false } },
+        db,
+      );
+      pending.delete(token);
+    }
+    await appendMessage(conversationId, 'user', { text: body.message }, db);
+  }
   const history = toAgentMessages(await getMessages(conversationId, db));
 
   const encoder = new TextEncoder();

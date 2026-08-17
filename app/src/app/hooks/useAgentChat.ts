@@ -60,6 +60,16 @@ export function useAgentChat() {
           });
         else if (e.type === 'proposal' && e.affordance)
           setAffordances((a) => [...a, e.affordance as UIAffordance]);
+        else if (e.type === 'error')
+          // The server hit a mid-stream provider error. The HTTP response was
+          // already 200 (so res.ok passed and the catch below never fires) and a
+          // clean EOF is not a throw — without this the user would see an empty
+          // bubble. Surface it the same way the non-ok/catch paths do.
+          setMessages((m) => {
+            const c = [...m];
+            c[c.length - 1] = { role: 'assistant', text: `⚠️ ${e.message}` };
+            return c;
+          });
       }
     }
   }, []);
