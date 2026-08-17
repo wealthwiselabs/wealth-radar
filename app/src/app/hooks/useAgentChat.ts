@@ -99,6 +99,16 @@ export function useAgentChat() {
     [consume],
   );
 
+  // Start a fresh conversation: drop local transcript + affordances and forget
+  // the server conversation id (the next send creates a new one server-side).
+  // The caller gates this on `!streaming`, so we never clear mid-stream out from
+  // under `consume`, which appends to the last message.
+  const reset = useCallback(() => {
+    convId.current = null;
+    setMessages([]);
+    setAffordances([]);
+  }, []);
+
   const respond = useCallback(
     async (token: string, decision: 'approve' | 'deny', value?: unknown) => {
       // A tokenless suggestion is just a canned prompt — replay it as a send.
@@ -133,5 +143,7 @@ export function useAgentChat() {
     [consume, send],
   );
 
-  return { messages, affordances, streaming, send, respond };
+  return { messages, affordances, streaming, send, respond, reset };
 }
+
+export type AgentChat = ReturnType<typeof useAgentChat>;
