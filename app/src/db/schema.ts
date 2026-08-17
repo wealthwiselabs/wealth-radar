@@ -215,6 +215,21 @@ export const cashFlows = sqliteTable('cash_flows', {
   byAccountDate: index('flow_account_date').on(t.accountId, t.date),
 }));
 
+export const agentConversations = sqliteTable('agent_conversations', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+  modifiedAt: text('modified_at').notNull(),
+});
+
+export const agentMessages = sqliteTable('agent_messages', {
+  id: text('id').primaryKey(),
+  conversationId: text('conversation_id').notNull().references(() => agentConversations.id),
+  role: text('role').notNull(), // user | assistant | tool
+  content: text('content').notNull(), // JSON string
+  createdAt: text('created_at').notNull(),
+}, (t) => ({ byConv: index('agentmsg_conv').on(t.conversationId, t.createdAt) }));
+
 export const investmentTransactions = sqliteTable('investment_transactions', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),
