@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAgentChat } from '@/app/hooks/useAgentChat';
 import Affordances from '@/app/components/agent/Affordances';
+import MarkdownMessage from '@/app/components/agent/MarkdownMessage';
 
 export default function ChatPanel() {
   const { messages, affordances, streaming, send, respond } = useAgentChat();
@@ -11,8 +12,12 @@ export default function ChatPanel() {
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : 'text-left'}>
-            <span className="inline-block rounded px-2 py-1 bg-black/5 dark:bg-white/10 whitespace-pre-wrap">
-              {m.text || (streaming ? '…' : '')}
+            <span className="inline-block rounded px-2 py-1 bg-black/5 dark:bg-white/10">
+              {m.role === 'assistant' ? (
+                m.text ? <MarkdownMessage text={m.text} /> : streaming ? '…' : ''
+              ) : (
+                <span className="whitespace-pre-wrap">{m.text}</span>
+              )}
             </span>
           </div>
         ))}

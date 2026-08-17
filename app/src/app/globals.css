@@ -374,3 +374,107 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-base-hover);
 }
+
+/* Rendered markdown inside a chat bubble. Kept tight so it reads as a message,
+   not a document, and driven entirely by theme tokens so it works light/dark. */
+.chat-markdown {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  overflow-wrap: anywhere;
+}
+.chat-markdown > :first-child {
+  margin-top: 0;
+}
+.chat-markdown > :last-child {
+  margin-bottom: 0;
+}
+.chat-markdown p,
+.chat-markdown ul,
+.chat-markdown ol,
+.chat-markdown pre,
+.chat-markdown blockquote,
+.chat-markdown table {
+  margin: var(--space-2) 0;
+}
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  font-family: var(--font-stack-matter);
+  font-weight: 600;
+  line-height: 1.286rem;
+  margin: var(--space-3) 0 var(--space-2);
+}
+.chat-markdown h1 { font-size: 1.286rem; }
+.chat-markdown h2 { font-size: 1.143rem; }
+.chat-markdown h3,
+.chat-markdown h4 { font-size: 1rem; }
+.chat-markdown ul,
+.chat-markdown ol {
+  padding-left: var(--space-5);
+}
+.chat-markdown ul { list-style: disc; }
+.chat-markdown ol { list-style: decimal; }
+.chat-markdown li {
+  margin: var(--space-1) 0;
+}
+.chat-markdown li > ul,
+.chat-markdown li > ol {
+  margin: var(--space-1) 0;
+}
+.chat-markdown a {
+  color: var(--color-text-brand);
+  text-decoration: underline;
+}
+.chat-markdown strong {
+  font-weight: 600;
+}
+.chat-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.857rem;
+  background: var(--color-background-base-subdued);
+  border: 1px solid var(--color-border-base-subdued);
+  border-radius: var(--radius-1);
+  padding: 0.05rem 0.28rem;
+}
+.chat-markdown pre {
+  background: var(--color-background-base-subdued);
+  border: 1px solid var(--color-border-base-subdued);
+  border-radius: var(--radius-2);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+.chat-markdown pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.857rem;
+}
+.chat-markdown blockquote {
+  border-left: 3px solid var(--color-border-base-hover);
+  padding-left: var(--space-3);
+  color: var(--color-text-base-subdued);
+}
+.chat-markdown hr {
+  border: none;
+  border-top: 1px solid var(--color-border-base-subdued);
+  margin: var(--space-3) 0;
+}
+.chat-markdown-table {
+  overflow-x: auto;
+}
+.chat-markdown table {
+  border-collapse: collapse;
+  font-size: 0.857rem;
+  width: 100%;
+}
+.chat-markdown th,
+.chat-markdown td {
+  border: 1px solid var(--color-border-base-subdued);
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+}
+.chat-markdown th {
+  background: var(--color-background-base-subdued);
+  font-weight: 600;
+}
