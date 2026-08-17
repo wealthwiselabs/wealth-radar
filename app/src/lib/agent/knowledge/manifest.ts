@@ -43,6 +43,16 @@ export const KNOWLEDGE_MANIFEST: KnowledgeDoc[] = [
     body: read('tax-advantaged-accounts.md'),
   },
   {
+    topic: 'speculative-products',
+    description: 'Why to avoid options and similar high-risk, zero-sum instruments unless you are an expert, and keep speculation out of the core portfolio.',
+    body: read('speculative-products.md'),
+  },
+  {
+    topic: 'insurance',
+    description: 'Insurance as protection not investment: avoid IUL/VUL as investments (prefer term life + taxable investing), the narrow exception, and covering disability insurance for breadwinners.',
+    body: read('insurance.md'),
+  },
+  {
     topic: 'education-529',
     description: 'Saving for kids’ college with a separate 529 plan, started early.',
     body: read('education-529.md'),
