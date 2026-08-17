@@ -230,6 +230,12 @@ export const agentMessages = sqliteTable('agent_messages', {
   createdAt: text('created_at').notNull(),
 }, (t) => ({ byConv: index('agentmsg_conv').on(t.conversationId, t.createdAt) }));
 
+export const agentMemory = sqliteTable('agent_memory', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 export const investmentTransactions = sqliteTable('investment_transactions', {
   id: text('id').primaryKey(),
   accountId: text('account_id').notNull().references(() => accounts.id),
