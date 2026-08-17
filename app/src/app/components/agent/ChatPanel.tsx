@@ -4,6 +4,10 @@ import Affordances from '@/app/components/agent/Affordances';
 import MarkdownMessage from '@/app/components/agent/MarkdownMessage';
 import AssistantIcon from '@/app/components/agent/AssistantIcon';
 import type { AgentChat } from '@/app/hooks/useAgentChat';
+import { getStoredApiKey } from '@/lib/apiKey';
+import { notifyDataChanged } from '@/lib/dataEvents';
+import { pdfsFromFileList } from '@/lib/pdfBatch';
+import { importPdfsViaChat, formatImportSummary } from '@/lib/agentPdfImport';
 
 const iconBtn =
   'inline-flex items-center justify-center h-8 w-8 rounded-[var(--radius-2)] ' +
@@ -22,10 +26,13 @@ export default function ChatPanel({
   onMinimize: () => void;
   chat: AgentChat;
 }) {
-  const { messages, affordances, streaming, send, respond, reset } = chat;
+  const { messages, affordances, streaming, send, respond, reset, notify } = chat;
   const [draft, setDraft] = useState('');
+  const [importing, setImporting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const busy = streaming || importing;
 
   // Move focus to the input each time the panel opens.
   useEffect(() => {
@@ -39,9 +46,27 @@ export default function ChatPanel({
 
   const submit = () => {
     const text = draft.trim();
-    if (!text || streaming) return;
+    if (!text || busy) return;
     send(text);
     setDraft('');
+  };
+
+  // Attach → import bank-statement PDFs through the existing pipeline, then
+  // report the outcome as a bubble and refresh the app's tables/charts.
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = pdfsFromFileList(e.target.files);
+    e.target.value = ''; // allow re-picking the same file
+    if (files.length === 0) return;
+    setImporting(true);
+    try {
+      const summary = await importPdfsViaChat(files, getStoredApiKey());
+      notify(formatImportSummary(summary));
+      if (summary.importedCount > 0) notifyDataChanged();
+    } catch (err) {
+      notify(`⚠️ ${err instanceof Error ? err.message : 'Import failed. Please try again.'}`);
+    } finally {
+      setImporting(false);
+    }
   };
 
   return (
@@ -110,17 +135,47 @@ export default function ChatPanel({
         }}
       >
         <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          multiple
+          onChange={handleFiles}
+          className="hidden"
+        />
+        <button
+          type="button"
+          aria-label="Attach a statement PDF"
+          title="Attach a statement PDF"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy}
+          className={iconBtn}
+        >
+          {importing ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+              />
+            </svg>
+          )}
+        </button>
+        <input
           ref={inputRef}
           className="origin-input flex-1"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask about your finances…"
+          placeholder={importing ? 'Importing statement…' : 'Ask about your finances…'}
           aria-label="Message"
+          disabled={importing}
         />
         <button
           type="submit"
           aria-label="Send"
-          disabled={streaming || !draft.trim()}
+          disabled={busy || !draft.trim()}
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-2)] bg-[var(--color-background-brand-default)] text-[var(--color-text-inverse)] transition hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

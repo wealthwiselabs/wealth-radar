@@ -109,6 +109,12 @@ export function useAgentChat() {
     setAffordances([]);
   }, []);
 
+  // Append a local assistant bubble without a server round-trip. Used by the
+  // PDF-attach flow to report its result inline in the transcript.
+  const notify = useCallback((text: string) => {
+    setMessages((m) => [...m, { role: 'assistant', text }]);
+  }, []);
+
   const respond = useCallback(
     async (token: string, decision: 'approve' | 'deny', value?: unknown) => {
       // A tokenless suggestion is just a canned prompt — replay it as a send.
@@ -143,7 +149,7 @@ export function useAgentChat() {
     [consume, send],
   );
 
-  return { messages, affordances, streaming, send, respond, reset };
+  return { messages, affordances, streaming, send, respond, reset, notify };
 }
 
 export type AgentChat = ReturnType<typeof useAgentChat>;
