@@ -58,16 +58,14 @@ async function pumpLoop(
   for await (const e of loop) {
     if (e.type === 'text') assistantText += e.delta;
     if (e.type === 'proposal') {
-      // Persist any assistant prose that preceded the tool call, then the
-      // tool-call turn itself, before parking the proposal for a decision.
-      if (assistantText) {
-        await appendMessage(conversationId, 'assistant', { text: assistantText }, db);
-        assistantText = '';
-      }
+      // Persist ONE assistant turn combining any prose that preceded the tool
+      // call with the tool call itself — matching the loop's own message shape.
+      // Splitting these into two consecutive assistant rows would break resume:
+      // the Anthropic API rejects non-alternating same-role messages.
       await appendMessage(
         conversationId,
         'assistant',
-        { toolCalls: [{ id: e.token, name: e.toolName, input: e.input }] },
+        { text: assistantText || undefined, toolCalls: [{ id: e.token, name: e.toolName, input: e.input }] },
         db,
       );
       pending.set(e.token, { toolName: e.toolName, input: e.input, conversationId });
@@ -111,14 +109,17 @@ export async function POST(req: NextRequest) {
       decision: 'approve' | 'deny';
       value?: unknown;
     };
+    // Consume the token SYNCHRONOUSLY, before any await. A duplicate request
+    // (double-click, client retry) then finds no pending entry and is rejected,
+    // so a gated mutation can never run twice from one approval (no TOCTOU race).
     const p = pending.get(token);
     if (!p) return new Response('Unknown or expired proposal', { status: 400 });
+    pending.delete(token);
     const conversationId = p.conversationId;
 
     if (decision === 'approve') {
       const tool = byName.get(p.toolName);
       if (!tool) {
-        pending.delete(token);
         return new Response(`Unknown tool ${p.toolName}`, { status: 400 });
       }
       // The ONLY place a gated tool's run() executes: an explicit approval.
@@ -147,7 +148,6 @@ export async function POST(req: NextRequest) {
         db,
       );
     }
-    pending.delete(token);
 
     const history = toAgentMessages(await getMessages(conversationId, db));
     const encoder = new TextEncoder();
