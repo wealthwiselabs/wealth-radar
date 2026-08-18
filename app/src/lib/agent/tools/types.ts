@@ -10,6 +10,10 @@ export type Gate = 'none' | 'apply-undo' | 'confirm';
 
 export interface ToolContext {
   db: ReturnType<typeof getDb>;
+  /** Identifies the conversation a tool call belongs to, so tools can look up
+   * conversation-scoped state (e.g. a staged statement import). Optional for
+   * backward compatibility with callers/tests that don't need it. */
+  conversationId?: string;
 }
 
 export interface ToolResult {

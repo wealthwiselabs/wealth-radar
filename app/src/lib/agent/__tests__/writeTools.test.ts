@@ -20,12 +20,13 @@ const seed = (over: Record<string, unknown> = {}) => ({
 } as any);
 
 describe('write tools', () => {
-  it('exposes the four tools by name', () => {
-    expect(writeTools).toHaveLength(4);
+  it('exposes the five tools by name', () => {
+    expect(writeTools).toHaveLength(5);
     expect(writeToolsByName.get('edit_transaction_metadata')).toBe(editTransactionMetadataTool);
     expect(writeToolsByName.get('update_matching_rule')).toBe(updateMatchingRuleTool);
     expect(writeToolsByName.get('reconcile_transactions')).toBe(reconcileTransactionsTool);
     expect(writeToolsByName.get('merge_accounts')).toBe(mergeAccountsTool);
+    expect(writeToolsByName.get('import_statement')).toBeDefined();
   });
 
   it('edit_transaction_metadata is apply-undo gated and recategorizes one row', async () => {

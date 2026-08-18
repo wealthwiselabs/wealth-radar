@@ -3,11 +3,12 @@
 // snapshot / aggregate-recompute invariants. A gated tool's `run` only ever
 // executes through the route's explicit approve path (see chat/route.ts), never
 // from the loop itself.
-import { updateTransaction, createRule, deduplicateTransactions, findTransactionById, readTaxonomy } from '@/lib/storage';
+import { updateTransaction, createRule, deduplicateTransactions, findTransactionById, readTaxonomy, addTransactions } from '@/lib/storage';
 import { applyRule, previewRule } from '@/lib/ruleBackfill';
 import { mergeAccounts } from '@/lib/accountMerge';
 import { snapshotDb } from '@/lib/backup';
 import { PatternTooShortError } from '@/lib/ruleErrors';
+import { getStagedStatement, clearStagedStatement } from '@/lib/agent/staging';
 import type { Tool } from './types';
 
 export const editTransactionMetadataTool: Tool = {
@@ -182,11 +183,50 @@ export const mergeAccountsTool: Tool = {
   },
 };
 
+export const importStatementTool: Tool = {
+  gate: 'apply-undo',
+  spec: {
+    name: 'import_statement',
+    description: 'Import the currently staged (classified) statement into the transaction ledger.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  async preview(_input, ctx) {
+    const staged = getStagedStatement(ctx.conversationId ?? '');
+    if (!staged) {
+      return {
+        title: 'Import statement?',
+        diff: { summary: 'No statement is staged to import.' },
+        confirmLabel: 'Import',
+      };
+    }
+    const n = staged.transactions.length;
+    const dates = staged.transactions.map((t) => t.date).sort();
+    const range = dates.length ? `${dates[0]} – ${dates[dates.length - 1]}` : 'no dates';
+    const gross = staged.transactions.reduce((sum, t) => sum + t.amount, 0);
+    const summary = `${n} transaction(s) from "${staged.fileName}", ${range}, gross total ${gross.toFixed(2)}`;
+    return {
+      title: 'Import statement?',
+      diff: { summary },
+      confirmLabel: `Import ${n} transactions`,
+    };
+  },
+  async run(_input, ctx) {
+    const staged = getStagedStatement(ctx.conversationId ?? '');
+    if (!staged) return { content: 'Nothing staged to import.' };
+    snapshotDb('pre-agent-import', { db: ctx.db });
+    const res = await addTransactions(staged.transactions, ctx.db);
+    clearStagedStatement(ctx.conversationId!);
+    const count = res?.added?.length ?? staged.transactions.length;
+    return { content: `Imported ${count} transaction(s) from ${staged.fileName}.` };
+  },
+};
+
 export const writeTools: Tool[] = [
   editTransactionMetadataTool,
   updateMatchingRuleTool,
   reconcileTransactionsTool,
   mergeAccountsTool,
+  importStatementTool,
 ];
 
 export const writeToolsByName = new Map(writeTools.map((t) => [t.spec.name, t]));
