@@ -77,10 +77,15 @@ export function createAnthropicProvider(opts: { apiKey: string; client?: Anthrop
     async *streamChat(req: LLMRequest): AsyncIterable<LLMEvent> {
       const stream = client.messages.stream({
         model: req.model,
-        max_tokens: 8192,
-        // Adaptive thinking + high effort: the model decides when to think, and
-        // effort 'high' sets the depth (the 5-series removed budget_tokens).
-        thinking: { type: 'adaptive' },
+        // Thinking tokens count toward max_tokens, so keep this roomy or the
+        // reasoning eats the answer's budget.
+        max_tokens: 16000,
+        // Adaptive thinking on the 5-series (the model decides when/how deeply to
+        // think; effort 'high' sets the depth). `display: 'summarized'` is REQUIRED
+        // to actually STREAM the reasoning: display defaults to 'omitted' on
+        // Sonnet/Opus 5, and with 'omitted' the API emits NO thinking_delta events
+        // (empty thinking blocks) — which is why the panel only showed typing dots.
+        thinking: { type: 'adaptive', display: 'summarized' },
         output_config: { effort: 'high' },
         system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
         // Client tools plus Anthropic's server-side web_search tool.

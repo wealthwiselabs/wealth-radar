@@ -8,7 +8,7 @@ import type { AgentMessage } from './providers/types';
 // deliberately). Images are transient (current-turn only) and excluded here.
 
 const CONTEXT_WINDOW_TOKENS = 1_000_000;
-const OUTPUT_RESERVE = 8_192;       // matches the provider's max_tokens
+const OUTPUT_RESERVE = 16_000;      // matches the provider's max_tokens
 const OVERHEAD_RESERVE = 40_000;    // system prompt (taxonomy/knowledge/memory) + tools + margin
 
 /** Token budget available to the message history under a 1M-token window. */

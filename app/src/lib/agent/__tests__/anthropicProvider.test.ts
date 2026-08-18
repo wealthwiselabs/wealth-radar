@@ -60,7 +60,9 @@ describe('AnthropicProvider', () => {
     };
     const provider = createAnthropicProvider({ apiKey: 'k', client });
     await collect(provider.streamChat({ system: 's', messages: [], tools: [], model: 'claude-sonnet-5' }));
-    expect(params.thinking).toEqual({ type: 'adaptive' });
+    // display:'summarized' is required to actually STREAM reasoning — with the
+    // default 'omitted' the API emits no thinking_delta events (empty blocks).
+    expect(params.thinking).toEqual({ type: 'adaptive', display: 'summarized' });
     expect(params.output_config).toEqual({ effort: 'high' });
   });
 });
