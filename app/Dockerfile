@@ -35,14 +35,17 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Runtime needs: the build output, node_modules (better-sqlite3's native addon +
-# tsx for the startup migration), the migration sources, and the checked-in
-# taxonomy.json. The SQLite DB itself lives on the mounted volume at /data.
+# tsx for the startup migration), the migration sources, the agent knowledge
+# docs (read from disk at runtime by src/lib/agent/knowledge/manifest.ts), and
+# the checked-in taxonomy.json. The SQLite DB itself lives on the mounted
+# volume at /data.
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/src/db ./src/db
+COPY --from=builder /app/src/lib/agent/knowledge ./src/lib/agent/knowledge
 COPY --from=builder /app/data/taxonomy.json ./data/taxonomy.json
 
 EXPOSE 3000
