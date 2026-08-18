@@ -21,6 +21,8 @@ export function parseSSEChunk(buffer: string): { events: any[]; rest: string } {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
+  thinking?: string;
+  thinkingMs?: number;
 }
 
 export function useAgentChat() {
@@ -28,6 +30,21 @@ export function useAgentChat() {
   const [affordances, setAffordances] = useState<UIAffordance[]>([]);
   const [streaming, setStreaming] = useState(false);
   const convId = useRef<string | null>(null);
+  const thinkStart = useRef<number | null>(null);
+
+  // Stamp the elapsed thinking time onto the last assistant message and stop the
+  // timer. No-op when no thinking was streamed for this turn.
+  const finalizeThinking = useCallback(() => {
+    if (thinkStart.current == null) return;
+    const ms = Date.now() - thinkStart.current;
+    thinkStart.current = null;
+    setMessages((m) => {
+      const c = [...m];
+      const last = c[c.length - 1];
+      c[c.length - 1] = { ...last, thinkingMs: ms };
+      return c;
+    });
+  }, []);
 
   // Consume an SSE response, dispatching each event through the same parsing
   // path for both the initial send and an action resume.
@@ -52,30 +69,51 @@ export function useAgentChat() {
       buf = rest;
       for (const e of events) {
         if (e.type === 'conversation') convId.current = e.conversationId;
-        else if (e.type === 'text')
+        else if (e.type === 'thinking') {
+          if (thinkStart.current == null) thinkStart.current = Date.now();
           setMessages((m) => {
             const c = [...m];
-            c[c.length - 1] = { role: 'assistant', text: c[c.length - 1].text + e.delta };
+            const last = c[c.length - 1];
+            c[c.length - 1] = { ...last, thinking: (last.thinking ?? '') + e.delta };
             return c;
           });
-        else if (e.type === 'proposal' && e.affordance)
+        } else if (e.type === 'text')
+          setMessages((m) => {
+            const c = [...m];
+            const last = c[c.length - 1];
+            // First token of the answer: close out the thinking timer.
+            const done = !last.text && thinkStart.current != null;
+            const thinkingMs = done ? Date.now() - thinkStart.current! : last.thinkingMs;
+            if (done) thinkStart.current = null;
+            c[c.length - 1] = { ...last, text: last.text + e.delta, thinkingMs };
+            return c;
+          });
+        else if (e.type === 'proposal' && e.affordance) {
+          finalizeThinking();
           setAffordances((a) => [...a, e.affordance as UIAffordance]);
-        else if (e.type === 'error')
+        } else if (e.type === 'error') {
           // The server hit a mid-stream provider error. The HTTP response was
           // already 200 (so res.ok passed and the catch below never fires) and a
           // clean EOF is not a throw — without this the user would see an empty
           // bubble. Surface it the same way the non-ok/catch paths do.
+          finalizeThinking();
           setMessages((m) => {
             const c = [...m];
-            c[c.length - 1] = { role: 'assistant', text: `⚠️ ${e.message}` };
+            const last = c[c.length - 1];
+            c[c.length - 1] = { ...last, role: 'assistant', text: `⚠️ ${e.message}` };
             return c;
           });
+        }
       }
     }
-  }, []);
+    // Stream ended cleanly (loop exit) — stamp any still-open thinking timer so a
+    // thinking-only turn still shows a duration.
+    finalizeThinking();
+  }, [finalizeThinking]);
 
   const send = useCallback(
     async (text: string) => {
+      thinkStart.current = null;
       setAffordances([]);
       setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
       setStreaming(true);
@@ -122,6 +160,7 @@ export function useAgentChat() {
         if (typeof value === 'string') await send(value);
         return;
       }
+      thinkStart.current = null;
       setAffordances((a) => a.filter((x) => !('token' in x) || x.token !== token));
       setMessages((m) => [...m, { role: 'assistant', text: '' }]);
       setStreaming(true);

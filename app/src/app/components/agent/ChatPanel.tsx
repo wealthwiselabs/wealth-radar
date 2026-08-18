@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Affordances from '@/app/components/agent/Affordances';
 import MarkdownMessage from '@/app/components/agent/MarkdownMessage';
+import ThinkingPanel from '@/app/components/agent/ThinkingPanel';
 import AssistantIcon from '@/app/components/agent/AssistantIcon';
 import type { AgentChat } from '@/app/hooks/useAgentChat';
 import { getStoredApiKey } from '@/lib/apiKey';
@@ -119,9 +120,24 @@ export default function ChatPanel({
         {messages.length === 0 ? (
           <EmptyState />
         ) : (
-          messages.map((m, i) => (
-            <Bubble key={i} role={m.role} text={m.text} streaming={streaming} />
-          ))
+          messages.map((m, i) => {
+            const isLast = i === messages.length - 1;
+            // Drop assistant turns that never produced text or thinking (e.g. a
+            // resume that only ran a tool), except the live streaming one, which
+            // shows the typing dots.
+            if (m.role === 'assistant' && !m.text && !m.thinking && !(isLast && streaming))
+              return null;
+            return (
+              <Bubble
+                key={i}
+                role={m.role}
+                text={m.text}
+                thinking={m.thinking}
+                thinkingMs={m.thinkingMs}
+                streaming={streaming}
+              />
+            );
+          })
         )}
         <Affordances affordances={affordances} respond={respond} disabled={streaming} />
         <div ref={bottomRef} />
@@ -195,10 +211,14 @@ export default function ChatPanel({
 function Bubble({
   role,
   text,
+  thinking,
+  thinkingMs,
   streaming,
 }: {
   role: 'user' | 'assistant';
   text: string;
+  thinking?: string;
+  thinkingMs?: number;
   streaming: boolean;
 }) {
   const isUser = role === 'user';
@@ -213,11 +233,18 @@ function Bubble({
       >
         {isUser ? (
           <span className="whitespace-pre-wrap">{text}</span>
-        ) : text ? (
-          <MarkdownMessage text={text} />
-        ) : streaming ? (
-          <TypingDots />
-        ) : null}
+        ) : (
+          <>
+            {thinking ? (
+              <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} hasAnswer={!!text} />
+            ) : null}
+            {text ? (
+              <MarkdownMessage text={text} />
+            ) : streaming && !thinking ? (
+              <TypingDots />
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
