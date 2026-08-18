@@ -90,7 +90,7 @@ export function useAgentChat() {
             c[c.length - 1] = { ...last, text: last.text + e.delta, thinkingMs };
             return c;
           });
-        else if (e.type === 'proposal' && e.affordance) {
+        else if ((e.type === 'proposal' || e.type === 'proposal_batch') && e.affordance) {
           finalizeThinking();
           setAffordances((a) => [...a, e.affordance as UIAffordance]);
         } else if (e.type === 'error') {
@@ -180,7 +180,12 @@ export function useAgentChat() {
   );
 
   const respond = useCallback(
-    async (token: string, decision: 'approve' | 'deny', value?: unknown) => {
+    async (
+      token: string,
+      decision: 'approve' | 'deny',
+      value?: unknown,
+      scope?: 'once' | 'always',
+    ) => {
       // A tokenless suggestion is just a canned prompt — replay it as a send.
       if (!token) {
         if (typeof value === 'string') await send(value);
@@ -194,7 +199,10 @@ export function useAgentChat() {
         const res = await fetch('/api/agent/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAgentKeyHeaders() },
-          body: JSON.stringify({ conversationId: convId.current, action: { token, decision, value } }),
+          body: JSON.stringify({
+            conversationId: convId.current,
+            action: { token, decision, value, ...(scope ? { scope } : {}) },
+          }),
         });
         await consume(res);
         // A gated write tool is the only thing that produces a confirm

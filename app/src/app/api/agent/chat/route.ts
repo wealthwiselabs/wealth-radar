@@ -74,9 +74,23 @@ const byName = new Map(allTools.map((t) => [t.spec.name, t]));
 // nothing mutates without the user's decision. A single module-level Map keyed
 // by proposal token is adequate for this single-user local app; a globalThis
 // singleton keeps it stable across Next.js route-module reloads in dev.
-type PendingProposal = { toolName: string; input: unknown; conversationId: string };
+//
+// One parked entry may hold MANY calls: a single gated call parks a one-element
+// `calls` array; a batch (≥2 gated calls in one turn) parks all of them under one
+// token so a single Approve runs the lot. Each call carries its own `token` (the
+// id used for its persisted tool_call and matching tool_result); the single-call
+// case reuses the proposal token as that id.
+type PendingCall = { token?: string; toolName: string; input: unknown };
+type PendingProposal = { conversationId: string; calls: PendingCall[] };
 const pending: Map<string, PendingProposal> =
   ((globalThis as any).__agentPending ??= new Map<string, PendingProposal>());
+
+// Per-conversation "don't ask again" grants: tool names the user approved with
+// scope 'always'. Threaded into runAgent as `grantedTools` so a gated call whose
+// name is in the set runs directly on subsequent turns. Same globalThis-singleton
+// treatment as `pending` for dev route-reload stability.
+const grants: Map<string, Set<string>> =
+  ((globalThis as any).__agentGrants ??= new Map<string, Set<string>>());
 
 /**
  * Drive one agent loop, streaming its events to the SSE controller while
@@ -107,7 +121,33 @@ async function pumpLoop(
           { text: assistantText || undefined, toolCalls: [{ id: e.token, name: e.toolName, input: e.input }] },
           db,
         );
-        pending.set(e.token, { toolName: e.toolName, input: e.input, conversationId });
+        // One-element parked entry; the call reuses the proposal token as its id.
+        pending.set(e.token, {
+          conversationId,
+          calls: [{ token: e.token, toolName: e.toolName, input: e.input }],
+        });
+        controller.enqueue(encoder.encode(sseEncode(e)));
+        return;
+      }
+      if (e.type === 'proposal_batch') {
+        // Persist ONE assistant turn whose toolCalls are ALL of the batched calls
+        // (one id per call, derived from the batch token). The matching
+        // tool_results are appended on the approve/deny path using these same ids.
+        const calls: PendingCall[] = e.calls.map((c, i) => ({
+          token: `${e.token}.${i}`,
+          toolName: c.toolName,
+          input: c.input,
+        }));
+        await appendMessage(
+          conversationId,
+          'assistant',
+          {
+            text: assistantText || undefined,
+            toolCalls: calls.map((c) => ({ id: c.token!, name: c.toolName, input: c.input })),
+          },
+          db,
+        );
+        pending.set(e.token, { conversationId, calls });
         controller.enqueue(encoder.encode(sseEncode(e)));
         return;
       }
@@ -133,6 +173,7 @@ function newLoop(
   memoryText: string,
   note: string,
   conversationId: string,
+  grantedTools?: Set<string>,
 ) {
   const provider = createProvider(cfg);
   return runAgent({
@@ -144,6 +185,8 @@ function newLoop(
     // conversationId lets conversation-scoped tools (e.g. import_statement) read
     // the staged statement for THIS conversation.
     ctx: { db, conversationId },
+    // Tools the user approved with "don't ask again" run directly this turn.
+    grantedTools,
     signal,
   });
 }
@@ -167,10 +210,11 @@ export async function POST(req: NextRequest) {
 
   // --- Action resume path: an explicit approve/deny of a parked proposal. ---
   if (body.action) {
-    const { token, decision, value } = body.action as {
+    const { token, decision, value, scope } = body.action as {
       token: string;
       decision: 'approve' | 'deny';
       value?: unknown;
+      scope?: 'once' | 'always';
     };
     // Consume the token SYNCHRONOUSLY, before any await. A duplicate request
     // (double-click, client retry) then finds no pending entry and is rejected,
@@ -181,37 +225,61 @@ export async function POST(req: NextRequest) {
     const conversationId = p.conversationId;
 
     if (decision === 'approve') {
-      const tool = byName.get(p.toolName);
-      if (!tool) {
-        return new Response(`Unknown tool ${p.toolName}`, { status: 400 });
-      }
-      // The ONLY place a gated tool's run() executes: an explicit approval.
-      const input = value !== undefined ? value : p.input;
-      try {
-        // conversationId so a conversation-scoped tool (import_statement) can
-        // read the statement staged for this conversation on the approve path.
-        const res = await tool.run(input, { db, conversationId });
-        await appendMessage(
-          conversationId,
-          'tool',
-          { toolResult: { id: token, content: res.content, isError: res.isError } },
-          db,
-        );
-      } catch (err) {
-        await appendMessage(
-          conversationId,
-          'tool',
-          { toolResult: { id: token, content: `Error: ${String(err)}`, isError: true } },
-          db,
-        );
+      // Run EVERY parked call in order. A single-call proposal is just
+      // calls.length === 1, so this covers both the old single path and batches.
+      for (const call of p.calls) {
+        const callId = call.token ?? token;
+        const tool = byName.get(call.toolName);
+        if (!tool) {
+          await appendMessage(
+            conversationId,
+            'tool',
+            { toolResult: { id: callId, content: `Unknown tool ${call.toolName}`, isError: true } },
+            db,
+          );
+          continue;
+        }
+        // The optional value override only makes sense for a single-call
+        // proposal (e.g. an edited confirm); a batch runs each call's own input.
+        const input = p.calls.length === 1 && value !== undefined ? value : call.input;
+        // The ONLY place a gated tool's run() executes: an explicit approval.
+        try {
+          // conversationId so a conversation-scoped tool (import_statement) can
+          // read the statement staged for this conversation on the approve path.
+          const res = await tool.run(input, { db, conversationId });
+          await appendMessage(
+            conversationId,
+            'tool',
+            { toolResult: { id: callId, content: res.content, isError: res.isError } },
+            db,
+          );
+        } catch (err) {
+          await appendMessage(
+            conversationId,
+            'tool',
+            { toolResult: { id: callId, content: `Error: ${String(err)}`, isError: true } },
+            db,
+          );
+        }
+        // "Don't ask again": grant this tool for the rest of the conversation.
+        if (scope === 'always') {
+          let set = grants.get(conversationId);
+          if (!set) { set = new Set<string>(); grants.set(conversationId, set); }
+          set.add(call.toolName);
+        }
       }
     } else {
-      await appendMessage(
-        conversationId,
-        'tool',
-        { toolResult: { id: token, content: 'User declined.', isError: false } },
-        db,
-      );
+      // Decline: one synthetic tool_result per parked call keeps history
+      // well-formed (each tool_use gets a matching tool_result).
+      for (const call of p.calls) {
+        const callId = call.token ?? token;
+        await appendMessage(
+          conversationId,
+          'tool',
+          { toolResult: { id: callId, content: 'User declined.', isError: false } },
+          db,
+        );
+      }
     }
 
     const history = toAgentMessages(await getMessages(conversationId, db));
@@ -220,7 +288,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote, conversationId), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -243,12 +311,15 @@ export async function POST(req: NextRequest) {
     // path above consumes its own token, so this only ever fires for abandoned cards.
     for (const [token, p] of pending) {
       if (p.conversationId !== conversationId) continue;
-      await appendMessage(
-        conversationId,
-        'tool',
-        { toolResult: { id: token, content: 'User moved on without confirming.', isError: false } },
-        db,
-      );
+      // One synthetic tool_result per parked call (a batch parks many).
+      for (const call of p.calls) {
+        await appendMessage(
+          conversationId,
+          'tool',
+          { toolResult: { id: call.token ?? token, content: 'User moved on without confirming.', isError: false } },
+          db,
+        );
+      }
       pending.delete(token);
     }
     await appendMessage(conversationId, 'user', { text: body.message }, db);
@@ -271,7 +342,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, note, conversationId), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }

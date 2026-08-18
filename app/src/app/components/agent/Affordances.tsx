@@ -1,7 +1,12 @@
 'use client';
 import type { UIAffordance } from '@/lib/agent/ui';
 
-export type RespondFn = (token: string, decision: 'approve' | 'deny', value?: unknown) => void;
+export type RespondFn = (
+  token: string,
+  decision: 'approve' | 'deny',
+  value?: unknown,
+  scope?: 'once' | 'always',
+) => void;
 
 export default function Affordances({
   affordances,
@@ -61,6 +66,13 @@ function Affordance({
           <button
             className="origin-btn origin-btn-secondary"
             disabled={disabled}
+            onClick={() => respond(a.token, 'approve', undefined, 'always')}
+          >
+            Approve &amp; don&apos;t ask again
+          </button>
+          <button
+            className="origin-btn origin-btn-secondary"
+            disabled={disabled}
             onClick={() => respond(a.token, 'deny')}
           >
             Deny
@@ -86,6 +98,13 @@ function Affordance({
             onClick={() => respond(a.token, 'approve')}
           >
             {a.confirmLabel}
+          </button>
+          <button
+            className="origin-btn origin-btn-secondary"
+            disabled={disabled}
+            onClick={() => respond(a.token, 'approve', undefined, 'always')}
+          >
+            Approve &amp; don&apos;t ask again
           </button>
           <button
             className="origin-btn origin-btn-secondary"
