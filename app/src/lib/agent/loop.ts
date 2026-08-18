@@ -8,6 +8,7 @@ export type LoopEvent =
   | { type: 'thinking'; delta: string }
   | { type: 'tool_start'; name: string }
   | { type: 'proposal'; token: string; toolName: string; input: unknown; affordance: UIAffordance }
+  | { type: 'proposal_batch'; token: string; calls: { toolName: string; input: unknown }[]; affordance: UIAffordance }
   | { type: 'done' };
 
 export interface RunAgentOpts {
@@ -19,6 +20,8 @@ export interface RunAgentOpts {
   ctx: ToolContext;
   maxIterations?: number;
   signal?: AbortSignal;
+  /** Gated tools whose calls should run directly without a proposal, like gate:'none'. */
+  grantedTools?: Set<string>;
 }
 
 export async function* runAgent(opts: RunAgentOpts): AsyncIterable<LoopEvent> {
@@ -44,24 +47,14 @@ export async function* runAgent(opts: RunAgentOpts): AsyncIterable<LoopEvent> {
     // Record the assistant turn (text + tool calls) before results.
     messages.push({ role: 'assistant', text: assistantText || undefined, toolCalls: calls });
 
+    // Run non-gated (and granted) calls first; collect the rest as gated.
+    const gated: { id: string; name: string; input: unknown; tool: Tool }[] = [];
     for (const call of calls) {
       const tool = byName.get(call.name);
       if (!tool) { messages.push({ role: 'tool', toolResult: { id: call.id, content: `Unknown tool ${call.name}`, isError: true } }); continue; }
-      if (tool.gate !== 'none') {
-        // Gated: stop and hand the decision to the user. Do NOT mutate.
-        const token = randomUUID();
-        const p = tool.preview
-          ? await tool.preview(call.input, opts.ctx)
-          : { title: `Confirm ${call.name}?`, diff: { summary: JSON.stringify(call.input) }, confirmLabel: 'Confirm' };
-        yield {
-          type: 'proposal',
-          token,
-          toolName: call.name,
-          input: call.input,
-          affordance: { kind: 'confirm', token, title: p.title, diff: p.diff, confirmLabel: p.confirmLabel },
-        };
-        return;
-      }
+      const granted = opts.grantedTools?.has(tool.spec.name) ?? false;
+      if (tool.gate !== 'none' && !granted) { gated.push({ ...call, tool }); continue; }
+      // Non-gated, or gated-but-granted: run directly.
       yield { type: 'tool_start', name: call.name };
       try {
         const res = await tool.run(call.input, opts.ctx);
@@ -69,6 +62,44 @@ export async function* runAgent(opts: RunAgentOpts): AsyncIterable<LoopEvent> {
       } catch (err) {
         messages.push({ role: 'tool', toolResult: { id: call.id, content: `Error: ${String(err)}`, isError: true } });
       }
+    }
+
+    if (gated.length === 1) {
+      // Single gated call: stop and hand the decision to the user. Do NOT mutate.
+      const call = gated[0];
+      const token = randomUUID();
+      const p = call.tool.preview
+        ? await call.tool.preview(call.input, opts.ctx)
+        : { title: `Confirm ${call.name}?`, diff: { summary: JSON.stringify(call.input) }, confirmLabel: 'Confirm' };
+      yield {
+        type: 'proposal',
+        token,
+        toolName: call.name,
+        input: call.input,
+        affordance: { kind: 'confirm', token, title: p.title, diff: p.diff, confirmLabel: p.confirmLabel },
+      };
+      return;
+    }
+
+    if (gated.length >= 2) {
+      // Multiple gated calls: batch them into a single confirmation. Do NOT mutate.
+      const token = randomUUID();
+      const items: { summary: string }[] = [];
+      for (const call of gated) {
+        if (call.tool.preview) {
+          const p = await call.tool.preview(call.input, opts.ctx);
+          items.push({ summary: p.diff.summary });
+        } else {
+          items.push({ summary: `Confirm ${call.name}` });
+        }
+      }
+      yield {
+        type: 'proposal_batch',
+        token,
+        calls: gated.map((c) => ({ toolName: c.name, input: c.input })),
+        affordance: { kind: 'confirm_batch', token, title: `Confirm ${gated.length} actions`, items, confirmLabel: 'Confirm all' },
+      };
+      return;
     }
   }
   yield { type: 'done' };

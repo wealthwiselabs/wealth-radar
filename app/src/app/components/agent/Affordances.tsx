@@ -66,6 +66,35 @@ function Affordance({
     );
   }
 
+  if (a.kind === 'confirm_batch') {
+    return (
+      <div className="rounded border p-3 space-y-2 text-left">
+        <div className="font-medium">{a.title}</div>
+        <ul className="text-sm opacity-80 space-y-1 list-disc pl-4">
+          {a.items.map((it, idx) => (
+            <li key={idx}>{it.summary}</li>
+          ))}
+        </ul>
+        <div className="flex gap-2 pt-1">
+          <button
+            className="rounded px-3 py-1 bg-black/80 text-white disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => respond(a.token, 'approve')}
+          >
+            {a.confirmLabel}
+          </button>
+          <button
+            className="rounded px-3 py-1 border disabled:opacity-50"
+            disabled={disabled}
+            onClick={() => respond(a.token, 'deny')}
+          >
+            Deny
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (a.kind === 'select' || a.kind === 'multiselect') {
     return (
       <div className="rounded border p-3 space-y-2 text-left">

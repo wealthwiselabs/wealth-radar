@@ -12,6 +12,7 @@ export interface DiffView {
 
 export type UIAffordance =
   | { kind: 'confirm'; token: string; title: string; diff: DiffView; confirmLabel: string }
+  | { kind: 'confirm_batch'; token: string; title: string; items: { summary: string }[]; confirmLabel: string }
   | { kind: 'select'; token: string; prompt: string; options: Option[] }
   | { kind: 'multiselect'; token: string; prompt: string; options: Option[] }
   | { kind: 'account_picker'; token: string; prompt: string; accounts: { id: string; label: string }[] }
