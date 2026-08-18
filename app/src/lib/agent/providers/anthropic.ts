@@ -6,22 +6,38 @@ export interface AnthropicLike {
   messages: { stream(params: unknown): AsyncIterable<any> };
 }
 
-function toAnthropicMessages(messages: AgentMessage[]) {
-  return messages.map((m) => {
+export function toAnthropicMessages(messages: AgentMessage[]) {
+  const out: { role: 'user' | 'assistant'; content: unknown }[] = [];
+  for (const m of messages) {
     if (m.role === 'tool') {
-      return {
-        role: 'user' as const,
-        content: [{ type: 'tool_result', tool_use_id: m.toolResult!.id, content: m.toolResult!.content, is_error: m.toolResult!.isError }],
+      const block = {
+        type: 'tool_result',
+        tool_use_id: m.toolResult!.id,
+        content: m.toolResult!.content,
+        is_error: m.toolResult!.isError,
       };
+      // Anthropic requires ALL tool_results for a parallel-tool-use assistant
+      // turn in a SINGLE user message. Merge consecutive `tool` rows into the
+      // same user message rather than emitting one user message per result
+      // (which would be non-alternating and 400).
+      const prev = out[out.length - 1];
+      if (prev && prev.role === 'user' && Array.isArray(prev.content)) {
+        (prev.content as unknown[]).push(block);
+      } else {
+        out.push({ role: 'user', content: [block] });
+      }
+      continue;
     }
     if (m.role === 'assistant' && m.toolCalls?.length) {
       const blocks: unknown[] = [];
       if (m.text) blocks.push({ type: 'text', text: m.text });
       for (const c of m.toolCalls) blocks.push({ type: 'tool_use', id: c.id, name: c.name, input: c.input });
-      return { role: 'assistant' as const, content: blocks };
+      out.push({ role: 'assistant', content: blocks });
+      continue;
     }
-    return { role: m.role as 'user' | 'assistant', content: m.text ?? '' };
-  });
+    out.push({ role: m.role as 'user' | 'assistant', content: m.text ?? '' });
+  }
+  return out;
 }
 
 function toAnthropicTools(tools: ToolSpec[]) {

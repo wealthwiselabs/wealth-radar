@@ -7,6 +7,7 @@ import { writeTools } from '@/lib/agent/tools/write';
 import { loadKnowledgeTool } from '@/lib/agent/tools/knowledge';
 import { makeSpawnTaskTool } from '@/lib/agent/tools/spawn';
 import { saveMemoryTool } from '@/lib/agent/tools/memory';
+import { webTools } from '@/lib/agent/tools/web';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
 import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
@@ -66,7 +67,7 @@ function toAgentMessages(stored: { role: string; content: any }[]): AgentMessage
 // The single registry of tools the route exposes to the agent. Task 11 appends
 // gated write tools here; keeping it as one list means that change is one line
 // and the approve path below resolves any tool by name.
-const allTools: Tool[] = [...readTools, ...writeTools, loadKnowledgeTool, saveMemoryTool];
+const allTools: Tool[] = [...readTools, ...writeTools, ...webTools, loadKnowledgeTool, saveMemoryTool];
 const byName = new Map(allTools.map((t) => [t.spec.name, t]));
 
 // Proposals that are awaiting an explicit approve/deny. A gated tool's `run`
@@ -134,7 +135,7 @@ async function pumpLoop(
         // (one id per call, derived from the batch token). The matching
         // tool_results are appended on the approve/deny path using these same ids.
         const calls: PendingCall[] = e.calls.map((c, i) => ({
-          token: `${e.token}.${i}`,
+          token: `${e.token}_${i}`,
           toolName: c.toolName,
           input: c.input,
         }));
