@@ -29,7 +29,8 @@ export default function AgentWidget() {
 
   // Persisted, clamped panel width (only used in wide mode). Seed from
   // localStorage inside an effect so SSR never touches window/localStorage.
-  const [width, setWidth] = useState(400);
+  // Default is a comfortably wide dock; users can drag it narrower/wider.
+  const [width, setWidth] = useState(520);
   useEffect(() => {
     const stored = Number(localStorage.getItem(WIDTH_STORAGE_KEY));
     if (Number.isFinite(stored) && stored > 0) {
