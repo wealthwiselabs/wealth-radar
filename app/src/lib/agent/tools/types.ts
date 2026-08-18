@@ -8,12 +8,22 @@ import type { ToolSpec } from '@/lib/agent/providers/types';
  */
 export type Gate = 'none' | 'apply-undo' | 'confirm';
 
+/** Progress a long-running tool reports through the side-channel below. */
+export type ProgressEvent =
+  | { kind: 'phase'; label: string }
+  | { kind: 'fetch'; url: string };
+
 export interface ToolContext {
   db: ReturnType<typeof getDb>;
   /** Identifies the conversation a tool call belongs to, so tools can look up
    * conversation-scoped state (e.g. a staged statement import). Optional for
    * backward compatibility with callers/tests that don't need it. */
   conversationId?: string;
+  /** Optional side-channel for a slow tool (e.g. deep_research) to report
+   * progress while it runs; the route streams these as SSE `progress` frames so
+   * the UI can show "Researching… (N sources)". Undefined for tests/callers that
+   * don't wire it. */
+  onProgress?: (ev: ProgressEvent) => void;
 }
 
 export interface ToolResult {

@@ -169,6 +169,23 @@ async function pumpLoop(
   }
 }
 
+// A tool-progress emitter that streams `progress` SSE frames as a slow tool
+// (deep_research) reports phases and page fetches, composing labels like
+// "Researching 4 topics… (3 sources)". One per stream (its own counter).
+function makeProgressEmitter(
+  controller: ReadableStreamDefaultController,
+  encoder: TextEncoder,
+): ToolContext['onProgress'] {
+  let sources = 0;
+  let phase = 'Researching';
+  return (ev) => {
+    if (ev.kind === 'phase') phase = ev.label;
+    else if (ev.kind === 'fetch') sources += 1;
+    const label = sources > 0 ? `${phase}… (${sources} source${sources === 1 ? '' : 's'})` : `${phase}…`;
+    controller.enqueue(encoder.encode(sseEncode({ type: 'progress', label })));
+  };
+}
+
 function newLoop(
   history: AgentMessage[],
   cfg: AgentConfig,
@@ -179,6 +196,7 @@ function newLoop(
   note: string,
   conversationId: string,
   grantedTools?: Set<string>,
+  onProgress?: ToolContext['onProgress'],
 ) {
   const provider = createProvider(cfg);
   return runAgent({
@@ -192,8 +210,9 @@ function newLoop(
       makeDeepResearchTool({ provider, model: cfg.model }),
     ],
     // conversationId lets conversation-scoped tools (e.g. import_statement) read
-    // the staged statement for THIS conversation.
-    ctx: { db, conversationId },
+    // the staged statement for THIS conversation; onProgress lets a slow tool
+    // (deep_research) stream "Researching… (N sources)" updates to the client.
+    ctx: { db, conversationId, onProgress },
     // Tools the user approved with "don't ask again" run directly this turn.
     grantedTools,
     signal,
@@ -302,7 +321,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId), makeProgressEmitter(controller, encoder)), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -372,7 +391,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId), makeProgressEmitter(controller, encoder)), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }

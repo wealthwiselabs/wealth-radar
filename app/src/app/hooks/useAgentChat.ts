@@ -31,6 +31,8 @@ export function useAgentChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [affordances, setAffordances] = useState<UIAffordance[]>([]);
   const [streaming, setStreaming] = useState(false);
+  // Live status label for a slow tool (e.g. deep_research): "Researching… (N sources)".
+  const [progress, setProgress] = useState<string | null>(null);
   const convId = useRef<string | null>(null);
   const thinkStart = useRef<number | null>(null);
 
@@ -71,6 +73,7 @@ export function useAgentChat() {
       buf = rest;
       for (const e of events) {
         if (e.type === 'conversation') convId.current = e.conversationId;
+        else if (e.type === 'progress') setProgress(e.label);
         else if (e.type === 'thinking') {
           if (thinkStart.current == null) thinkStart.current = Date.now();
           setMessages((m) => {
@@ -79,7 +82,8 @@ export function useAgentChat() {
             c[c.length - 1] = { ...last, thinking: (last.thinking ?? '') + e.delta };
             return c;
           });
-        } else if (e.type === 'text')
+        } else if (e.type === 'text') {
+          setProgress(null); // the answer has started — drop any tool-progress label
           setMessages((m) => {
             const c = [...m];
             const last = c[c.length - 1];
@@ -90,7 +94,7 @@ export function useAgentChat() {
             c[c.length - 1] = { ...last, text: last.text + e.delta, thinkingMs };
             return c;
           });
-        else if ((e.type === 'proposal' || e.type === 'proposal_batch') && e.affordance) {
+        } else if ((e.type === 'proposal' || e.type === 'proposal_batch') && e.affordance) {
           finalizeThinking();
           setAffordances((a) => [...a, e.affordance as UIAffordance]);
         } else if (e.type === 'error') {
@@ -109,8 +113,9 @@ export function useAgentChat() {
       }
     }
     // Stream ended cleanly (loop exit) — stamp any still-open thinking timer so a
-    // thinking-only turn still shows a duration.
+    // thinking-only turn still shows a duration, and drop any tool-progress label.
     finalizeThinking();
+    setProgress(null);
   }, [finalizeThinking]);
 
   const send = useCallback(
@@ -120,6 +125,7 @@ export function useAgentChat() {
       images?: { mediaType: string; data: string }[],
     ) => {
       thinkStart.current = null;
+      setProgress(null);
       setAffordances([]);
       setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
       setStreaming(true);
@@ -194,6 +200,7 @@ export function useAgentChat() {
         return;
       }
       thinkStart.current = null;
+      setProgress(null);
       setAffordances((a) => a.filter((x) => !('token' in x) || x.token !== token));
       setMessages((m) => [...m, { role: 'assistant', text: '' }]);
       setStreaming(true);
@@ -224,7 +231,7 @@ export function useAgentChat() {
     [consume, send],
   );
 
-  return { messages, affordances, streaming, send, respond, reset, notify, loadConversation };
+  return { messages, affordances, streaming, progress, send, respond, reset, notify, loadConversation };
 }
 
 export type AgentChat = ReturnType<typeof useAgentChat>;

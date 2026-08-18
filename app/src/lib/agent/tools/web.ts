@@ -102,7 +102,7 @@ export const webFetchTool: Tool = {
       additionalProperties: false,
     },
   },
-  async run(input: { url: string }) {
+  async run(input: { url: string }, ctx?: { onProgress?: (ev: { kind: 'fetch'; url: string }) => void }) {
     const { url } = input;
     // Fast literal pre-check: rejects obviously-internal hosts before any I/O.
     if (!isFetchableUrl(url)) {
@@ -134,6 +134,8 @@ export const webFetchTool: Tool = {
       const capped = buffer.byteLength > MAX_BODY_BYTES ? buffer.slice(0, MAX_BODY_BYTES) : buffer;
       const text = new TextDecoder('utf-8', { fatal: false }).decode(capped);
       const plain = stripHtml(text).slice(0, MAX_CONTENT_CHARS);
+      // Report the page read so the UI can show a live "(N sources)" count.
+      ctx?.onProgress?.({ kind: 'fetch', url: res.url });
       return { content: plain };
     } catch {
       return { content: 'Could not fetch that URL (timed out or unreachable).' };

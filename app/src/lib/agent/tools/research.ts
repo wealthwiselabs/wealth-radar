@@ -75,6 +75,7 @@ export function makeDeepResearchTool(env: { provider: LLMProvider; model: string
       const question = input.question;
 
       // Stage 1 — DECOMPOSE into focused sub-questions.
+      ctx.onProgress?.({ kind: 'phase', label: 'Planning research' });
       const planText = await runPass({
         provider,
         model,
@@ -89,6 +90,10 @@ export function makeDeepResearchTool(env: { provider: LLMProvider; model: string
         maxIterations: 1,
       });
       const subQuestions = parseSubQuestions(planText, question);
+      ctx.onProgress?.({
+        kind: 'phase',
+        label: `Researching ${subQuestions.length} ${subQuestions.length === 1 ? 'topic' : 'topics'}`,
+      });
 
       // Stage 2 — RESEARCH each sub-question IN PARALLEL, each with a reflect loop.
       const findings = await Promise.all(
@@ -119,6 +124,8 @@ export function makeDeepResearchTool(env: { provider: LLMProvider; model: string
         .join('\n\n');
 
       if (!draft.trim()) return { content: 'The research sub-tasks produced no findings.' };
+
+      ctx.onProgress?.({ kind: 'phase', label: 'Verifying sources' });
 
       // Stages 3+4 — VERIFY (re-fetch cited sources, check credibility/contradictions)
       // and FUSE into one cited report.

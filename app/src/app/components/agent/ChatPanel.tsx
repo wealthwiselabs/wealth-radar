@@ -34,7 +34,7 @@ export default function ChatPanel({
   width?: number;
   onWidth?: (px: number) => void;
 }) {
-  const { messages, affordances, streaming, send, respond, reset, notify, loadConversation } = chat;
+  const { messages, affordances, streaming, progress, send, respond, reset, notify, loadConversation } = chat;
   const [draft, setDraft] = useState('');
   const [parsing, setParsing] = useState(false);
   const [staged, setStaged] = useState<{
@@ -296,6 +296,7 @@ export default function ChatPanel({
                     thinking={m.thinking}
                     thinkingMs={m.thinkingMs}
                     streaming={streaming}
+                    progress={isLast ? progress : null}
                   />
                 );
               })
@@ -445,12 +446,14 @@ function Bubble({
   thinking,
   thinkingMs,
   streaming,
+  progress,
 }: {
   role: 'user' | 'assistant';
   text: string;
   thinking?: string;
   thinkingMs?: number;
   streaming: boolean;
+  progress?: string | null;
 }) {
   const isUser = role === 'user';
   return (
@@ -471,6 +474,11 @@ function Bubble({
             ) : null}
             {text ? (
               <MarkdownMessage text={text} />
+            ) : progress ? (
+              <span className="flex items-center gap-[var(--space-2)] py-1 text-xsmall text-[var(--color-text-base-subdued)]">
+                <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                {progress}
+              </span>
             ) : streaming && !thinking ? (
               <TypingDots />
             ) : null}
