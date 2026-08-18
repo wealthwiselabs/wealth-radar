@@ -4,6 +4,7 @@ import Affordances from '@/app/components/agent/Affordances';
 import MarkdownMessage from '@/app/components/agent/MarkdownMessage';
 import ThinkingPanel from '@/app/components/agent/ThinkingPanel';
 import AssistantIcon from '@/app/components/agent/AssistantIcon';
+import HistoryView from '@/app/components/agent/HistoryView';
 import type { AgentChat } from '@/app/hooks/useAgentChat';
 import { getStoredApiKey } from '@/lib/apiKey';
 import { notifyDataChanged } from '@/lib/dataEvents';
@@ -27,9 +28,10 @@ export default function ChatPanel({
   onMinimize: () => void;
   chat: AgentChat;
 }) {
-  const { messages, affordances, streaming, send, respond, reset, notify } = chat;
+  const { messages, affordances, streaming, send, respond, reset, notify, loadConversation } = chat;
   const [draft, setDraft] = useState('');
   const [importing, setImporting] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +90,22 @@ export default function ChatPanel({
         </span>
         <button
           type="button"
+          aria-label="Chat history"
+          title="History"
+          onClick={() => setShowHistory(true)}
+          className={iconBtn}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
           aria-label="New chat"
           title="New chat"
           onClick={reset}
@@ -112,30 +130,46 @@ export default function ChatPanel({
       </header>
 
       <div className="flex-1 space-y-[var(--space-3)] overflow-y-auto px-[var(--space-4)] py-[var(--space-4)]">
-        {messages.length === 0 ? (
-          <EmptyState />
+        {showHistory ? (
+          <HistoryView
+            onOpen={(id) => {
+              loadConversation(id);
+              setShowHistory(false);
+            }}
+            onNew={() => {
+              reset();
+              setShowHistory(false);
+            }}
+            onClose={() => setShowHistory(false)}
+          />
         ) : (
-          messages.map((m, i) => {
-            const isLast = i === messages.length - 1;
-            // Drop assistant turns that never produced text or thinking (e.g. a
-            // resume that only ran a tool), except the live streaming one, which
-            // shows the typing dots.
-            if (m.role === 'assistant' && !m.text && !m.thinking && !(isLast && streaming))
-              return null;
-            return (
-              <Bubble
-                key={i}
-                role={m.role}
-                text={m.text}
-                thinking={m.thinking}
-                thinkingMs={m.thinkingMs}
-                streaming={streaming}
-              />
-            );
-          })
+          <>
+            {messages.length === 0 ? (
+              <EmptyState />
+            ) : (
+              messages.map((m, i) => {
+                const isLast = i === messages.length - 1;
+                // Drop assistant turns that never produced text or thinking (e.g. a
+                // resume that only ran a tool), except the live streaming one, which
+                // shows the typing dots.
+                if (m.role === 'assistant' && !m.text && !m.thinking && !(isLast && streaming))
+                  return null;
+                return (
+                  <Bubble
+                    key={i}
+                    role={m.role}
+                    text={m.text}
+                    thinking={m.thinking}
+                    thinkingMs={m.thinkingMs}
+                    streaming={streaming}
+                  />
+                );
+              })
+            )}
+            <Affordances affordances={affordances} respond={respond} disabled={streaming} />
+            <div ref={bottomRef} />
+          </>
         )}
-        <Affordances affordances={affordances} respond={respond} disabled={streaming} />
-        <div ref={bottomRef} />
       </div>
 
       <form

@@ -153,6 +153,22 @@ export function useAgentChat() {
     setMessages((m) => [...m, { role: 'assistant', text }]);
   }, []);
 
+  // Load a past conversation's transcript from the server and make it the
+  // active conversation (subsequent sends continue it). Gated on !streaming
+  // for the same reason as `reset`.
+  const loadConversation = useCallback(
+    async (id: string) => {
+      if (streaming) return;
+      const res = await fetch(`/api/agent/conversations/${id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setMessages(data.messages ?? []);
+      setAffordances([]);
+      convId.current = id;
+    },
+    [streaming],
+  );
+
   const respond = useCallback(
     async (token: string, decision: 'approve' | 'deny', value?: unknown) => {
       // A tokenless suggestion is just a canned prompt — replay it as a send.
@@ -188,7 +204,7 @@ export function useAgentChat() {
     [consume, send],
   );
 
-  return { messages, affordances, streaming, send, respond, reset, notify };
+  return { messages, affordances, streaming, send, respond, reset, notify, loadConversation };
 }
 
 export type AgentChat = ReturnType<typeof useAgentChat>;
