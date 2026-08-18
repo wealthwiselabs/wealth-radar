@@ -28,6 +28,11 @@ function toAnthropicTools(tools: ToolSpec[]) {
   return tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.inputSchema }));
 }
 
+// Anthropic's server-side web search tool. This runs on Anthropic's side (not as
+// a client tool the agent loop executes), so it only applies in this provider.
+// Tool-type string bound to what the installed SDK supports (WebSearchTool20250305).
+const WEB_SEARCH_TOOL = { type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 5 };
+
 export function createAnthropicProvider(opts: { apiKey: string; client?: AnthropicLike; }): LLMProvider {
   const client: AnthropicLike = opts.client ?? (new Anthropic({ apiKey: opts.apiKey }) as unknown as AnthropicLike);
   return {
@@ -40,7 +45,8 @@ export function createAnthropicProvider(opts: { apiKey: string; client?: Anthrop
         thinking: { type: 'adaptive' },
         output_config: { effort: 'high' },
         system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-        tools: toAnthropicTools(req.tools),
+        // Client tools plus Anthropic's server-side web_search tool.
+        tools: [...toAnthropicTools(req.tools), WEB_SEARCH_TOOL],
         messages: toAnthropicMessages(req.messages),
       });
 
@@ -54,6 +60,11 @@ export function createAnthropicProvider(opts: { apiKey: string; client?: Anthrop
             if (e.content_block?.type === 'tool_use') {
               toolBlocks.set(e.index, { id: e.content_block.id, name: e.content_block.name, json: '' });
             }
+            // Server-side tools (web_search) run on Anthropic's side. Their blocks
+            // (`server_tool_use` / `web_search_tool_result`) are consumed internally
+            // and deliberately NOT tracked in toolBlocks, so they never surface as a
+            // `tool_call` for the agent loop to execute as a client tool. The
+            // assistant `text` blocks around them keep flowing normally.
             break;
           case 'content_block_delta':
             if (e.delta?.type === 'text_delta') yield { type: 'text', delta: e.delta.text };
