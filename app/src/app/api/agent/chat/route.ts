@@ -13,6 +13,7 @@ import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/a
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
 import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
 import { readTaxonomy } from '@/lib/storage';
+import { trimHistory } from '@/lib/agent/history';
 import type { AgentMessage } from '@/lib/agent/providers/types';
 import { formatViewContext } from '@/app/lib/viewContext';
 import { stageStatement } from '@/lib/agent/staging';
@@ -296,7 +297,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -366,7 +367,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }
