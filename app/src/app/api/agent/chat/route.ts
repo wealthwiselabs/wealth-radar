@@ -13,7 +13,33 @@ import { createConversation, appendMessage, getMessages } from '@/lib/agent/conv
 import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
 import type { AgentMessage } from '@/lib/agent/providers/types';
 import { formatViewContext } from '@/app/lib/viewContext';
+import { stageStatement } from '@/lib/agent/staging';
+import type { PendingTransaction } from '@/types';
 import { sseEncode } from './sse';
+
+/**
+ * Build a compact system-prompt note describing a just-staged statement so the
+ * model can answer questions about it and knows how to import it. Kept short:
+ * a header line (file, count, date range, gross total), up to ~10 sample rows,
+ * and the import instruction.
+ */
+function formatAttachmentNote(a: { fileName: string; transactions: PendingTransaction[] }): string {
+  const txns = a.transactions;
+  const n = txns.length;
+  const dates = txns.map((t) => t.date).filter(Boolean).sort();
+  const range = dates.length ? `${dates[0]} to ${dates[dates.length - 1]}` : 'no dates';
+  const gross = txns.reduce((sum, t) => sum + t.amount, 0);
+  const sample = txns
+    .slice(0, 10)
+    .map((t) => `${t.date} | ${t.description} | ${t.amount}`)
+    .join('\n');
+  const lines = [
+    `A statement "${a.fileName}" is staged with ${n} transaction(s), dates ${range}, gross total ${gross.toFixed(2)}.`,
+  ];
+  if (sample) lines.push(`Sample rows:\n${sample}`);
+  lines.push('Call import_statement to import these if the user asks.');
+  return lines.join('\n');
+}
 
 /**
  * Append a delimited note to a system prompt for a single turn. Kept generic so
@@ -105,16 +131,19 @@ function newLoop(
   db: ToolContext['db'],
   signal: AbortSignal,
   memoryText: string,
-  viewNote: string,
+  note: string,
+  conversationId: string,
 ) {
   const provider = createProvider(cfg);
   return runAgent({
     provider,
     model: cfg.model,
-    system: withContextNote(buildSystemPrompt(memoryText), viewNote),
+    system: withContextNote(buildSystemPrompt(memoryText), note),
     messages: history,
     tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
-    ctx: { db },
+    // conversationId lets conversation-scoped tools (e.g. import_statement) read
+    // the staged statement for THIS conversation.
+    ctx: { db, conversationId },
     signal,
   });
 }
@@ -159,7 +188,9 @@ export async function POST(req: NextRequest) {
       // The ONLY place a gated tool's run() executes: an explicit approval.
       const input = value !== undefined ? value : p.input;
       try {
-        const res = await tool.run(input, { db });
+        // conversationId so a conversation-scoped tool (import_statement) can
+        // read the statement staged for this conversation on the approve path.
+        const res = await tool.run(input, { db, conversationId });
         await appendMessage(
           conversationId,
           'tool',
@@ -189,7 +220,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote, conversationId), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -224,12 +255,23 @@ export async function POST(req: NextRequest) {
   }
   const history = toAgentMessages(await getMessages(conversationId, db));
 
+  // A chat-panel attachment stages a classified statement for THIS turn. Stage
+  // it (keyed by conversationId so import_statement can find it) and fold a
+  // compact summary into the per-turn note alongside the existing view note.
+  const attachment = body.attachment as
+    | { fileName: string; transactions: PendingTransaction[] }
+    | undefined;
+  if (attachment) stageStatement(conversationId, attachment);
+  const note = [viewNote, attachment ? formatAttachmentNote(attachment) : '']
+    .filter(Boolean)
+    .join('\n\n');
+
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, note, conversationId), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }

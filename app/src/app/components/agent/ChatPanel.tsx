@@ -7,9 +7,9 @@ import AssistantIcon from '@/app/components/agent/AssistantIcon';
 import HistoryView from '@/app/components/agent/HistoryView';
 import type { AgentChat } from '@/app/hooks/useAgentChat';
 import { getStoredApiKey } from '@/lib/apiKey';
-import { notifyDataChanged } from '@/lib/dataEvents';
-import { pdfsFromFileList } from '@/lib/pdfBatch';
-import { importPdfsViaChat, formatImportSummary } from '@/lib/agentPdfImport';
+import { pdfsFromFileList, pdfsFromDataTransfer } from '@/lib/pdfBatch';
+import { parsePdfsViaChat } from '@/lib/agentPdfImport';
+import type { PendingTransaction } from '@/types';
 
 const iconBtn =
   'inline-flex items-center justify-center h-8 w-8 rounded-[var(--radius-2)] ' +
@@ -36,12 +36,17 @@ export default function ChatPanel({
 }) {
   const { messages, affordances, streaming, send, respond, reset, notify, loadConversation } = chat;
   const [draft, setDraft] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [staged, setStaged] = useState<{
+    fileName: string;
+    transactions: PendingTransaction[];
+  } | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const busy = streaming || importing;
+  const busy = streaming || parsing;
 
   // Move focus to the input each time the panel opens.
   useEffect(() => {
@@ -56,26 +61,43 @@ export default function ChatPanel({
   const submit = () => {
     const text = draft.trim();
     if (!text || busy) return;
-    send(text);
+    // The staged statement (if any) rides along with this message; the agent
+    // decides whether to import it (via import_statement) or just answer.
+    send(text, staged ?? undefined);
+    setStaged(null);
     setDraft('');
   };
 
-  // Attach → import bank-statement PDFs through the existing pipeline, then
-  // report the outcome as a bubble and refresh the app's tables/charts.
+  // Attach/drop → PARSE bank-statement PDFs (extract + classify) and STAGE the
+  // result. Nothing is committed here; the user's next message decides what the
+  // agent does with it. Multiple files fold into one staged batch.
+  const stageFiles = async (files: File[]) => {
+    if (files.length === 0 || busy) return;
+    setParsing(true);
+    try {
+      const { staged: rows, errors } = await parsePdfsViaChat(files, getStoredApiKey());
+      if (rows.length > 0) {
+        const combined =
+          rows.length === 1
+            ? rows[0]
+            : {
+                fileName: `${rows.length} files`,
+                transactions: rows.flatMap((r) => r.transactions),
+              };
+        setStaged(combined);
+      }
+      for (const err of errors) notify(`⚠️ ${err.file}: ${err.message}`);
+    } catch (err) {
+      notify(`⚠️ ${err instanceof Error ? err.message : 'Could not read the PDF. Please try again.'}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = pdfsFromFileList(e.target.files);
     e.target.value = ''; // allow re-picking the same file
-    if (files.length === 0) return;
-    setImporting(true);
-    try {
-      const summary = await importPdfsViaChat(files, getStoredApiKey());
-      notify(formatImportSummary(summary));
-      if (summary.importedCount > 0) notifyDataChanged();
-    } catch (err) {
-      notify(`⚠️ ${err instanceof Error ? err.message : 'Import failed. Please try again.'}`);
-    } finally {
-      setImporting(false);
-    }
+    await stageFiles(files);
   };
 
   return (
@@ -86,7 +108,30 @@ export default function ChatPanel({
       onKeyDown={(e) => {
         if (e.key === 'Escape') onMinimize();
       }}
+      onDragOver={(e) => {
+        if (busy) return;
+        e.preventDefault();
+        setDragActive(true);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        setDragActive(false);
+      }}
+      onDrop={async (e) => {
+        e.preventDefault();
+        setDragActive(false);
+        if (busy) return;
+        const files = await pdfsFromDataTransfer(e.dataTransfer);
+        await stageFiles(files);
+      }}
     >
+      {dragActive ? (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-3)] border-2 border-dashed border-[var(--color-border-brand-default)] bg-[var(--color-background-brand-subdued)]/80">
+          <span className="text-small font-medium text-[var(--color-text-brand)]">
+            Drop a statement PDF
+          </span>
+        </div>
+      ) : null}
       {wide ? (
         <div
           role="separator"
@@ -216,6 +261,26 @@ export default function ChatPanel({
         )}
       </div>
 
+      {staged ? (
+        <div className="flex items-center gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] px-[var(--space-3)] pt-[var(--space-2)]">
+          <span className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-2)] bg-[var(--color-background-base-subdued)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall text-[var(--color-text-base-default)]">
+            <span className="truncate">
+              📄 {staged.fileName} — {staged.transactions.length} transaction
+              {staged.transactions.length === 1 ? '' : 's'} parsed
+            </span>
+            <button
+              type="button"
+              aria-label="Remove staged statement"
+              title="Remove staged statement"
+              onClick={() => setStaged(null)}
+              className="text-[var(--color-icon-base-default)] hover:text-[var(--color-text-base-default)]"
+            >
+              ✕
+            </button>
+          </span>
+        </div>
+      ) : null}
+
       <form
         className="flex items-center gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] p-[var(--space-3)]"
         onSubmit={(e) => {
@@ -239,7 +304,7 @@ export default function ChatPanel({
           disabled={busy}
           className={iconBtn}
         >
-          {importing ? (
+          {parsing ? (
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
           ) : (
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -257,9 +322,9 @@ export default function ChatPanel({
           className="origin-input flex-1"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={importing ? 'Importing statement…' : 'Ask about your finances…'}
+          placeholder={parsing ? 'Reading statement…' : 'Ask about your finances…'}
           aria-label="Message"
-          disabled={importing}
+          disabled={parsing}
         />
         <button
           type="submit"

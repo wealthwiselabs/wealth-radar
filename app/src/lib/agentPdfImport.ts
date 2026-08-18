@@ -60,6 +60,36 @@ async function classifyOne(file: File, apiKey: string): Promise<PerFile> {
   }
 }
 
+/**
+ * Parse-only variant of {@link importPdfsViaChat}: extract → classify every PDF,
+ * but DO NOT commit anything. Bank statements come back as staged rows for the
+ * chat panel to hold until the user asks the agent to import them (via the gated
+ * `import_statement` tool). Investment statements can't be staged this way, so
+ * they are surfaced as errors pointing at the full Import panel.
+ */
+export async function parsePdfsViaChat(
+  files: File[],
+  apiKey: string,
+): Promise<{
+  staged: { fileName: string; transactions: PendingTransaction[] }[];
+  errors: { file: string; message: string }[];
+}> {
+  const perFile = await runWithConcurrency(files, CONCURRENCY, (f) => classifyOne(f, apiKey));
+
+  const staged = perFile
+    .filter((r): r is Extract<PerFile, { kind: 'bank' }> => r.kind === 'bank')
+    .map((r) => ({ fileName: r.file, transactions: r.transactions }));
+
+  const errors: { file: string; message: string }[] = [];
+  for (const r of perFile) {
+    if (r.kind === 'error') errors.push({ file: r.file, message: r.message });
+    else if (r.kind === 'investment')
+      errors.push({ file: r.file, message: 'investment statements import via the Import panel' });
+  }
+
+  return { staged, errors };
+}
+
 /** Classify every PDF, then commit all bank transactions in one save. */
 export async function importPdfsViaChat(
   files: File[],

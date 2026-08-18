@@ -4,6 +4,7 @@ import { getAgentKeyHeaders } from '@/lib/apiKey';
 import { notifyDataChanged } from '@/lib/dataEvents';
 import { getViewContext } from '@/app/lib/viewContext';
 import type { UIAffordance } from '@/lib/agent/ui';
+import type { PendingTransaction } from '@/types';
 
 // Splits an SSE byte stream on the `\n\n` frame delimiter and JSON-parses each
 // `data: ` line. Pure so it can be unit-tested without a fetch/ReadableStream
@@ -113,7 +114,10 @@ export function useAgentChat() {
   }, [finalizeThinking]);
 
   const send = useCallback(
-    async (text: string) => {
+    async (
+      text: string,
+      attachment?: { fileName: string; transactions: PendingTransaction[] },
+    ) => {
       thinkStart.current = null;
       setAffordances([]);
       setMessages((m) => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
@@ -122,7 +126,12 @@ export function useAgentChat() {
         const res = await fetch('/api/agent/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAgentKeyHeaders() },
-          body: JSON.stringify({ conversationId: convId.current, message: text, viewContext: getViewContext() }),
+          body: JSON.stringify({
+            conversationId: convId.current,
+            message: text,
+            viewContext: getViewContext(),
+            ...(attachment ? { attachment } : {}),
+          }),
         });
         await consume(res);
       } catch {
