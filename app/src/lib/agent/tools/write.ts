@@ -3,7 +3,7 @@
 // snapshot / aggregate-recompute invariants. A gated tool's `run` only ever
 // executes through the route's explicit approve path (see chat/route.ts), never
 // from the loop itself.
-import { updateTransaction, createRule, deduplicateTransactions } from '@/lib/storage';
+import { updateTransaction, createRule, deduplicateTransactions, findTransactionById, readTaxonomy } from '@/lib/storage';
 import { applyRule, previewRule } from '@/lib/ruleBackfill';
 import { mergeAccounts } from '@/lib/accountMerge';
 import { snapshotDb } from '@/lib/backup';
@@ -26,6 +26,38 @@ export const editTransactionMetadataTool: Tool = {
       required: ['id'],
       additionalProperties: false,
     },
+  },
+  async preview(input: { id: string; categoryId?: string; subcategoryId?: string; note?: string }, { db }) {
+    const tx = await findTransactionById(input.id, db);
+    if (!tx) {
+      return {
+        title: 'Recategorize transaction?',
+        diff: { summary: `Transaction ${input.id} not found` },
+        confirmLabel: 'Apply',
+      };
+    }
+
+    let summary: string;
+    if (input.categoryId || input.subcategoryId) {
+      const taxonomy = await readTaxonomy();
+      const category = taxonomy.categories.find((c) => c.id === input.categoryId);
+      const subcategory = category?.subcategories.find((s) => s.id === input.subcategoryId)
+        ?? taxonomy.categories
+          .flatMap((c) => c.subcategories)
+          .find((s) => s.id === input.subcategoryId);
+      const categoryName = category?.name ?? input.categoryId;
+      const subcategoryName = subcategory?.name ?? input.subcategoryId;
+      const target = [categoryName, subcategoryName].filter(Boolean).join(' / ');
+      summary = `"${tx.description}" → ${target}`;
+    } else {
+      summary = `"${tx.description}" note → "${input.note ?? ''}"`;
+    }
+
+    return {
+      title: 'Recategorize transaction?',
+      diff: { summary },
+      confirmLabel: 'Apply',
+    };
   },
   // updateTransaction already defaults omitted fields to the existing values and
   // recomputes monthly aggregates internally, so we neither read a `before` nor
