@@ -76,8 +76,15 @@ describe('querySpendingTool', () => {
 });
 
 describe('readTools', () => {
-  it('exports both read tools', () => {
-    expect(readTools.map((t) => t.spec.name).sort()).toEqual(['query_spending', 'search_transactions']);
+  it('exports the read tools (transactions + spending + investments)', () => {
+    expect(readTools.map((t) => t.spec.name).sort()).toEqual([
+      'investment_summary',
+      'list_investment_transactions',
+      'query_investment_returns',
+      'query_reserve',
+      'query_spending',
+      'search_transactions',
+    ]);
     expect(readTools.every((t) => t.gate === 'none')).toBe(true);
   });
 });
