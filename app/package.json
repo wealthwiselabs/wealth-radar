@@ -20,6 +20,7 @@
     "investments:import-statements": "tsx scripts/import-statements.ts",
     "e2e": "playwright test",
     "demo:seed": "tsx scripts/seed-demo.ts",
+    "demo:seed-investments": "tsx scripts/seed-demo-investments.ts",
     "screenshots": "npm run demo:seed && playwright test -c playwright.screenshots.config.ts"
   },
   "dependencies": {
