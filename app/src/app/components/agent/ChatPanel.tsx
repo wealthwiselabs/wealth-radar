@@ -470,7 +470,7 @@ function Bubble({
         ) : (
           <>
             {thinking ? (
-              <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} hasAnswer={!!text} />
+              <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} />
             ) : null}
             {text ? (
               <MarkdownMessage text={text} />

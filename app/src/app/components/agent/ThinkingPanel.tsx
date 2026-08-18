@@ -18,9 +18,11 @@ function LiveDots() {
 }
 
 export default function ThinkingPanel({
-  thinking, thinkingMs, hasAnswer,
-}: { thinking: string; thinkingMs?: number; hasAnswer: boolean }) {
-  const [open, setOpen] = useState(!hasAnswer);
+  thinking, thinkingMs,
+}: { thinking: string; thinkingMs?: number }) {
+  // Collapsed by default — the animated "Thinking…" chip shows it's working; the
+  // user expands to watch the reasoning stream if they want to.
+  const [open, setOpen] = useState(false);
   const active = thinkingMs == null; // still reasoning (no duration stamped yet)
   return (
     <div className="mb-[var(--space-2)]">
