@@ -11,6 +11,27 @@ import { PatternTooShortError } from '@/lib/ruleErrors';
 import { getStagedStatement, clearStagedStatement } from '@/lib/agent/staging';
 import type { Tool } from './types';
 
+// Validate category/subcategory ids against the taxonomy so the model can't
+// write invented ids (e.g. "personal_care"/"fitness" when the real ids are
+// "personal-care"/"gym") that the UI can neither render nor filter. Returns
+// null when valid, else a message listing the valid ids so the model can
+// self-correct rather than silently corrupting a row.
+async function validateCategory(categoryId?: string, subcategoryId?: string): Promise<string | null> {
+  if (!categoryId && !subcategoryId) return null;
+  const taxonomy = await readTaxonomy();
+  if (!categoryId) {
+    return `A categoryId is required when setting a subcategory ("${subcategoryId}").`;
+  }
+  const category = taxonomy.categories.find((c) => c.id === categoryId);
+  if (!category) {
+    return `Unknown category "${categoryId}". Valid categories: ${taxonomy.categories.map((c) => c.id).join(', ')}.`;
+  }
+  if (subcategoryId && !category.subcategories.some((s) => s.id === subcategoryId)) {
+    return `Unknown subcategory "${subcategoryId}" for ${categoryId}. Valid: ${category.subcategories.map((s) => s.id).join(', ')}.`;
+  }
+  return null;
+}
+
 export const editTransactionMetadataTool: Tool = {
   gate: 'apply-undo',
   spec: {
@@ -65,6 +86,8 @@ export const editTransactionMetadataTool: Tool = {
   // recompute here. categorySource is only forced to 'manual' when a category is
   // actually being changed — a note-only edit must not make the row rule-immune.
   async run(input: { id: string; categoryId?: string; subcategoryId?: string; note?: string }, { db }) {
+    const invalid = await validateCategory(input.categoryId, input.subcategoryId);
+    if (invalid) return { content: invalid, isError: true };
     const updated = await updateTransaction(
       input.id,
       {
@@ -98,6 +121,10 @@ export const updateMatchingRuleTool: Tool = {
     },
   },
   async preview(input: { pattern: string; categoryId: string; subcategoryId: string }, { db }) {
+    const invalid = await validateCategory(input.categoryId, input.subcategoryId);
+    if (invalid) {
+      return { title: 'Create/Update matching rule?', diff: { summary: invalid }, confirmLabel: 'Apply rule' };
+    }
     const p = previewRule(
       { pattern: input.pattern, categoryId: input.categoryId, subcategoryId: input.subcategoryId },
       db,
@@ -112,6 +139,8 @@ export const updateMatchingRuleTool: Tool = {
     };
   },
   async run(input: { pattern: string; categoryId: string; subcategoryId: string }, { db }) {
+    const invalid = await validateCategory(input.categoryId, input.subcategoryId);
+    if (invalid) return { content: invalid, isError: true };
     snapshotDb('pre-agent-rule', { db });
     let rule;
     try {

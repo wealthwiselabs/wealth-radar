@@ -12,6 +12,7 @@ import type { Tool, ToolContext } from '@/lib/agent/tools/types';
 import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/agent/systemPrompt';
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
 import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
+import { readTaxonomy } from '@/lib/storage';
 import type { AgentMessage } from '@/lib/agent/providers/types';
 import { formatViewContext } from '@/app/lib/viewContext';
 import { stageStatement } from '@/lib/agent/staging';
@@ -172,6 +173,7 @@ function newLoop(
   db: ToolContext['db'],
   signal: AbortSignal,
   memoryText: string,
+  taxonomyText: string,
   note: string,
   conversationId: string,
   grantedTools?: Set<string>,
@@ -180,7 +182,7 @@ function newLoop(
   return runAgent({
     provider,
     model: cfg.model,
-    system: withContextNote(buildSystemPrompt(memoryText), note),
+    system: withContextNote(buildSystemPrompt(memoryText, taxonomyText), note),
     messages: history,
     tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
     // conversationId lets conversation-scoped tools (e.g. import_statement) read
@@ -198,6 +200,11 @@ export async function POST(req: NextRequest) {
   if (!cfg.apiKey) return new Response('No API key configured', { status: 401 });
   const db = getDb();
   const memoryText = formatMemoryForPrompt(await getAllMemory(db));
+  // Give the model the exact taxonomy ids so it never invents category/subcategory
+  // ids (write tools also validate, but this prevents the wasted round-trip).
+  const taxonomyText = (await readTaxonomy()).categories
+    .map((c) => `${c.id} (${c.name}): ${c.subcategories.map((s) => `${s.id} (${s.name})`).join(', ')}`)
+    .join('\n');
   // Compact snapshot of the page the user is looking at, sent by the chat panel.
   // Absent on the action-resume path (respond() sends no viewContext), in which
   // case this is '' and the system prompt is left unchanged.
@@ -289,7 +296,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -343,7 +350,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId)), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }
