@@ -6,6 +6,7 @@ import { readTools } from '@/lib/agent/tools/read';
 import { writeTools } from '@/lib/agent/tools/write';
 import { loadKnowledgeTool } from '@/lib/agent/tools/knowledge';
 import { makeSpawnTaskTool } from '@/lib/agent/tools/spawn';
+import { makeDeepResearchTool } from '@/lib/agent/tools/research';
 import { saveMemoryTool } from '@/lib/agent/tools/memory';
 import { webTools } from '@/lib/agent/tools/web';
 import type { Tool, ToolContext } from '@/lib/agent/tools/types';
@@ -185,7 +186,11 @@ function newLoop(
     model: cfg.model,
     system: withContextNote(buildSystemPrompt(memoryText, taxonomyText), note),
     messages: history,
-    tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
+    tools: [
+      ...allTools,
+      makeSpawnTaskTool({ provider, model: cfg.model }),
+      makeDeepResearchTool({ provider, model: cfg.model }),
+    ],
     // conversationId lets conversation-scoped tools (e.g. import_statement) read
     // the staged statement for THIS conversation.
     ctx: { db, conversationId },
