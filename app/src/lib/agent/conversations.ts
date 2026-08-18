@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { asc, eq } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { agentConversations, agentMessages } from '@/db/schema';
 
@@ -41,4 +41,53 @@ export async function getMessages(conversationId: string, db: Db = getDb()): Pro
     .where(eq(agentMessages.conversationId, conversationId))
     .orderBy(asc(agentMessages.createdAt));
   return rows.map((r) => ({ id: r.id, role: r.role, content: JSON.parse(r.content), createdAt: r.createdAt }));
+}
+
+export type ConversationSummary = { id: string; title: string; modifiedAt: string; messageCount: number };
+
+function messageText(content: string): string {
+  try {
+    const parsed = JSON.parse(content);
+    return typeof parsed?.text === 'string' ? parsed.text : '';
+  } catch {
+    return '';
+  }
+}
+
+export async function listConversations(db: Db = getDb()): Promise<ConversationSummary[]> {
+  const conversations = await db
+    .select()
+    .from(agentConversations)
+    // modifiedAt is only set at creation time today (appendMessage does not bump it), so two
+    // conversations created within the same millisecond would tie on modifiedAt; break ties by
+    // insertion order (rowid) so newest-created still sorts first.
+    .orderBy(desc(agentConversations.modifiedAt), desc(sql`rowid`));
+
+  const summaries: ConversationSummary[] = [];
+  for (const conv of conversations) {
+    const messages = await db
+      .select()
+      .from(agentMessages)
+      .where(eq(agentMessages.conversationId, conv.id))
+      .orderBy(asc(agentMessages.createdAt), asc(sql`rowid`));
+
+    const firstUserMessage = messages.find((m) => m.role === 'user');
+    if (!firstUserMessage) continue;
+
+    const rawTitle = messageText(firstUserMessage.content).trim();
+    const title = rawTitle.length > 0 ? rawTitle.slice(0, 60) : 'New chat';
+
+    const messageCount = messages.filter(
+      (m) => (m.role === 'user' || m.role === 'assistant') && messageText(m.content).trim().length > 0,
+    ).length;
+
+    summaries.push({ id: conv.id, title, modifiedAt: conv.modifiedAt, messageCount });
+  }
+
+  return summaries;
+}
+
+export async function deleteConversation(id: string, db: Db = getDb()): Promise<void> {
+  await db.delete(agentMessages).where(eq(agentMessages.conversationId, id));
+  await db.delete(agentConversations).where(eq(agentConversations.id, id));
 }
