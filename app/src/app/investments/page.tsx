@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PurposeTiles from '@/app/components/investments/PurposeTiles';
 import PortfolioTrendChart, { type TrendMetric } from '@/app/components/investments/PortfolioTrendChart';
 import AllocationTree from '@/app/components/investments/AllocationTree';
@@ -10,6 +10,7 @@ import SyncInvestmentsButton from '@/app/components/investments/SyncInvestmentsB
 import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
+import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
 import { PRESET_LABELS } from '@/lib/timeRange';
 import type { AllocationBasis } from '@/lib/investments/periods';
 import type { PurposePoint } from '@/lib/investments/series';
@@ -85,6 +86,30 @@ export default function InvestmentsPage() {
   };
 
   const handleBasisChange = (next: AllocationBasis) => setBasis(next);
+
+  // Publish a compact snapshot of the portfolio headline figures + selected
+  // range/basis so the assistant can "see" this page. Built from state already
+  // held here; a null latest reading shows as an em dash rather than a figure.
+  const viewSnapshot = useMemo(() => {
+    const val = (purpose: string): string => {
+      const pts = series[purpose]?.points ?? [];
+      const last = pts[pts.length - 1];
+      if (!last || last.accountsMissing.length > 0) return '—';
+      return `$${last.value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    };
+    return {
+      route: '/investments',
+      label: 'Investments',
+      timeRange: PRESET_LABELS[preset],
+      filters: { basis, metric },
+      highlights: [
+        { label: 'Portfolio', value: val('portfolio') },
+        { label: 'Education', value: val('education') },
+        { label: 'Insurance', value: val('insurance') },
+      ],
+    };
+  }, [series, preset, basis, metric]);
+  usePublishViewContext(loading || error ? null : viewSnapshot);
 
   return (
     <main className="min-h-screen p-[var(--space-6)] max-w-6xl mx-auto">

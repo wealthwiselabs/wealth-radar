@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { getAgentKeyHeaders } from '@/lib/apiKey';
 import { notifyDataChanged } from '@/lib/dataEvents';
+import { getViewContext } from '@/app/lib/viewContext';
 import type { UIAffordance } from '@/lib/agent/ui';
 
 // Splits an SSE byte stream on the `\n\n` frame delimiter and JSON-parses each
@@ -121,7 +122,7 @@ export function useAgentChat() {
         const res = await fetch('/api/agent/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAgentKeyHeaders() },
-          body: JSON.stringify({ conversationId: convId.current, message: text }),
+          body: JSON.stringify({ conversationId: convId.current, message: text, viewContext: getViewContext() }),
         });
         await consume(res);
       } catch {

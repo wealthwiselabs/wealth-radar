@@ -12,7 +12,21 @@ import { buildSystemPrompt, resolveAgentConfig, type AgentConfig } from '@/lib/a
 import { createConversation, appendMessage, getMessages } from '@/lib/agent/conversations';
 import { getAllMemory, formatMemoryForPrompt } from '@/lib/agent/memory';
 import type { AgentMessage } from '@/lib/agent/providers/types';
+import { formatViewContext } from '@/app/lib/viewContext';
 import { sseEncode } from './sse';
+
+/**
+ * Append a delimited note to a system prompt for a single turn. Kept generic so
+ * later tasks can reuse it for other per-turn notes; the tag simply frames the
+ * note for the model. Returns the prompt unchanged when the note is empty.
+ *
+ * Not `export`ed: a Next.js route module may only export route handlers, so an
+ * extra export trips the generated-types check. A later task that needs it
+ * elsewhere should lift it into a shared module.
+ */
+function withContextNote(system: string, note: string): string {
+  return note ? `${system}\n\n<current_view>\n${note}\n</current_view>` : system;
+}
 
 function toAgentMessages(stored: { role: string; content: any }[]): AgentMessage[] {
   return stored.map((m) => ({
@@ -91,12 +105,13 @@ function newLoop(
   db: ToolContext['db'],
   signal: AbortSignal,
   memoryText: string,
+  viewNote: string,
 ) {
   const provider = createProvider(cfg);
   return runAgent({
     provider,
     model: cfg.model,
-    system: buildSystemPrompt(memoryText),
+    system: withContextNote(buildSystemPrompt(memoryText), viewNote),
     messages: history,
     tools: [...allTools, makeSpawnTaskTool({ provider, model: cfg.model })],
     ctx: { db },
@@ -110,6 +125,10 @@ export async function POST(req: NextRequest) {
   if (!cfg.apiKey) return new Response('No API key configured', { status: 401 });
   const db = getDb();
   const memoryText = formatMemoryForPrompt(await getAllMemory(db));
+  // Compact snapshot of the page the user is looking at, sent by the chat panel.
+  // Absent on the action-resume path (respond() sends no viewContext), in which
+  // case this is '' and the system prompt is left unchanged.
+  const viewNote = formatViewContext(body.viewContext ?? null);
 
   const sseHeaders = {
     'Content-Type': 'text/event-stream',
@@ -170,7 +189,7 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
         try {
-          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText), controller, encoder, conversationId, db);
+          await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote), controller, encoder, conversationId, db);
         } finally {
           controller.close();
         }
@@ -210,7 +229,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
       try {
-        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText), controller, encoder, conversationId, db);
+        await pumpLoop(newLoop(history, cfg, db, req.signal, memoryText, viewNote), controller, encoder, conversationId, db);
       } finally {
         controller.close();
       }

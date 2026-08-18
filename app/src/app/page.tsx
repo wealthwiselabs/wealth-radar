@@ -12,7 +12,8 @@ import FinancialHealthChart from './components/charts/FinancialHealthChart';
 import TrailingAverageLabel from './components/TrailingAverageLabel';
 import { useAppConfig } from './hooks/useAppConfig';
 import { useTimeRange } from './hooks/useTimeRange';
-import type { Preset } from '@/lib/timeRange';
+import { usePublishViewContext } from './hooks/usePublishViewContext';
+import { PRESET_LABELS, type Preset } from '@/lib/timeRange';
 import type { Transaction, Category, DateRange } from '@/types';
 import { sumExpenses, sumIncome } from '@/lib/spending';
 import { onDataChanged, notifyDataChanged } from '@/lib/dataEvents';
@@ -223,6 +224,30 @@ export default function Home() {
   // transfers (card payments) as spending and disagreed with the chart below.
   const totalExpenses = sumExpenses(spendingTx);
   const totalIncome = sumIncome(spendingTx);
+
+  // Publish a compact snapshot of what's on screen so the assistant can "see"
+  // this page. Built only from values already in state — no extra computation.
+  const viewSnapshot = useMemo(() => {
+    const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    const filters: Record<string, string> = {};
+    if (tableFilters.categoryId) {
+      const cat = categories.find((c) => c.id === tableFilters.categoryId);
+      filters.category = cat?.name ?? tableFilters.categoryId;
+    }
+    if (tableFilters.month) filters.month = tableFilters.month;
+    return {
+      route: '/',
+      label: 'Home',
+      timeRange: PRESET_LABELS[preset],
+      ...(Object.keys(filters).length > 0 ? { filters } : {}),
+      highlights: [
+        { label: 'Total Expenses', value: `-${fmt(totalExpenses)}` },
+        { label: 'Total Income', value: `+${fmt(totalIncome)}` },
+        { label: 'Net', value: `${totalIncome - totalExpenses >= 0 ? '+' : '-'}${fmt(Math.abs(totalIncome - totalExpenses))}` },
+      ],
+    };
+  }, [preset, tableFilters, categories, totalExpenses, totalIncome]);
+  usePublishViewContext(viewSnapshot);
 
   if (isLoading) {
     return (
