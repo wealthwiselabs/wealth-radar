@@ -1,11 +1,13 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PurposeTiles from '@/app/components/investments/PurposeTiles';
 import ValueTrendChart, { type TrendPoint } from '@/app/components/investments/ValueTrendChart';
 import ReserveFlowsTable from '@/app/components/investments/ReserveFlowsTable';
 import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
+import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
+import { PRESET_LABELS } from '@/lib/timeRange';
 import { formatPercent, CHART_NEUTRAL } from '@/lib/chartConfig';
 
 interface TrendResponse {
@@ -90,6 +92,21 @@ export default function ReservePage() {
   // so rerun both fetches when the user returns to this one.
   const refreshAll = useCallback(() => { void load(); void loadCurrentValue(); }, [load, loadCurrentValue]);
   useRefreshOnFocus(refreshAll);
+
+  // Publish a compact snapshot (current reserve balance + selected range) so the
+  // assistant can "see" this page. A null balance shows as an em dash.
+  const viewSnapshot = useMemo(() => ({
+    route: '/investments/reserve',
+    label: 'Reserve',
+    timeRange: PRESET_LABELS[preset],
+    highlights: [
+      {
+        label: 'Reserve balance',
+        value: value == null ? '—' : `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      },
+    ],
+  }), [preset, value]);
+  usePublishViewContext(error ? null : viewSnapshot);
 
   return (
     <main className="min-h-screen p-[var(--space-6)] max-w-6xl mx-auto">

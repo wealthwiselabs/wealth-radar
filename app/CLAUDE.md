@@ -112,6 +112,24 @@ TDD: write the failing test, watch it fail, then implement. Unit tests live in
 (default `file:./data/app.db`), and for Plaid `PLAID_CLIENT_ID`, `PLAID_ENV`,
 `PLAID_SECRET_<ENV>`, `APP_ENCRYPTION_KEY`. Absent Plaid config → the app is PDF-only.
 
+## Running locally to test the assistant
+
+No secrets or `.env.local` are needed to try the chat assistant — the Anthropic key is
+entered in the UI, and the dev auth gate is off when `AUTH_PASSWORD` is unset.
+
+1. `cd app && npm run db:migrate` — one-time. Creates `data/app.db` (gitignored) with all
+   tables, including the assistant's `agent_conversations`, `agent_messages`, and
+   `agent_memory`.
+2. `cd app && npm run dev` → http://localhost:3000.
+3. Open **Settings** (top-right) and paste your Anthropic API key. Optionally set the
+   provider/model there too; it defaults to `claude-sonnet-5`. The key is stored in this
+   browser's localStorage and sent per-request as the `x-agent-api-key` header.
+4. Click the assistant launcher (bottom-right) and ask a question. PDF attach and
+   classification use the same key.
+5. Optional — to also exercise Plaid sync / bank import beyond PDFs, create your own local
+   `app/.env.local` from `app/.env.example` (see Environment below). **Never commit it.**
+6. Stop the server: `lsof -ti:3000 | xargs kill -9`.
+
 ## Git
 
 Remote is GitHub (`wealthwiselabs/wealth-radar`). Commit only when asked.

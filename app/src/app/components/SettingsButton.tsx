@@ -16,6 +16,28 @@ const THEMES: { value: ThemePreference; label: string }[] = [
   { value: 'system', label: 'System' },
 ];
 
+type AgentProvider = 'anthropic' | 'openai';
+
+const AGENT_PROVIDERS: { value: AgentProvider; label: string }[] = [
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+];
+
+const AGENT_MODEL_PLACEHOLDER: Record<AgentProvider, string> = {
+  anthropic: 'claude-sonnet-5',
+  openai: 'gpt-5.6',
+};
+
+const AGENT_PROVIDER_KEY = 'wealthwise:agent-provider';
+const AGENT_MODEL_KEY = 'wealthwise:agent-model';
+const AGENT_BASE_URL_KEY = 'wealthwise:agent-base-url';
+
+interface MemoryEntry {
+  key: string;
+  value: string;
+  updatedAt: string;
+}
+
 export default function SettingsButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [keyInput, setKeyInput] = useState('');
@@ -26,6 +48,11 @@ export default function SettingsButton() {
   // theme picker is worth previewing live — you cannot judge one from a label —
   // but a live preview still has to honour Cancel like the key field does.
   const [themeOnOpen, setThemeOnOpen] = useState<ThemePreference>('system');
+  const [agentProvider, setAgentProvider] = useState<AgentProvider>('anthropic');
+  const [agentModel, setAgentModel] = useState('');
+  const [agentBaseURL, setAgentBaseURL] = useState('');
+  const [memory, setMemory] = useState<MemoryEntry[]>([]);
+  const [memoryLoading, setMemoryLoading] = useState(false);
 
   useEffect(() => {
     setHasKey(!!getStoredApiKey());
@@ -36,7 +63,31 @@ export default function SettingsButton() {
     setKeyInput(getStoredApiKey());
     setTheme(stored);
     setThemeOnOpen(stored);
+    const storedProvider = window.localStorage.getItem(AGENT_PROVIDER_KEY);
+    setAgentProvider(storedProvider === 'openai' ? 'openai' : 'anthropic');
+    setAgentModel(window.localStorage.getItem(AGENT_MODEL_KEY) || '');
+    setAgentBaseURL(window.localStorage.getItem(AGENT_BASE_URL_KEY) || '');
     setIsOpen(true);
+    setMemoryLoading(true);
+    fetch('/api/agent/memory')
+      .then((res) => res.json())
+      .then((data) => setMemory(data.memory || []))
+      .catch(() => setMemory([]))
+      .finally(() => setMemoryLoading(false));
+  };
+
+  // Deletes apply immediately — this section doesn't participate in Cancel/Save.
+  const forgetMemory = async (key: string) => {
+    setMemory((prev) => prev.filter((e) => e.key !== key));
+    try {
+      await fetch('/api/agent/memory', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+    } catch {
+      // Best-effort: a failed delete just means the entry may reappear next open.
+    }
   };
 
   // Preview immediately; persisted only on Save.
@@ -49,6 +100,13 @@ export default function SettingsButton() {
     setStoredApiKey(keyInput);
     setStoredThemePreference(theme);
     setHasKey(!!keyInput.trim());
+    window.localStorage.setItem(AGENT_PROVIDER_KEY, agentProvider);
+    const trimmedModel = agentModel.trim();
+    if (trimmedModel) window.localStorage.setItem(AGENT_MODEL_KEY, trimmedModel);
+    else window.localStorage.removeItem(AGENT_MODEL_KEY);
+    const trimmedBaseURL = agentBaseURL.trim();
+    if (trimmedBaseURL) window.localStorage.setItem(AGENT_BASE_URL_KEY, trimmedBaseURL);
+    else window.localStorage.removeItem(AGENT_BASE_URL_KEY);
     setIsOpen(false);
   };
 
@@ -180,6 +238,98 @@ export default function SettingsButton() {
               <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
                 System follows your device's appearance setting, and keeps following it if
                 that changes. Previewed as you pick; applied on Save.
+              </p>
+            </fieldset>
+
+            <hr className="my-[var(--space-6)] border-[var(--color-border-base-subdued)]" />
+
+            <fieldset>
+              <legend className="text-small font-medium text-[var(--color-text-base-default)] mb-[var(--space-2)]">
+                Financial assistant
+              </legend>
+              <div className="flex flex-col gap-[var(--space-3)]">
+                <div>
+                  <label className="text-xsmall text-[var(--color-text-base-subdued)] block mb-[var(--space-1)]">
+                    Provider
+                  </label>
+                  <select
+                    value={agentProvider}
+                    onChange={(e) => setAgentProvider(e.target.value as AgentProvider)}
+                    className="origin-select w-full"
+                  >
+                    {AGENT_PROVIDERS.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xsmall text-[var(--color-text-base-subdued)] block mb-[var(--space-1)]">
+                    Model
+                  </label>
+                  <input
+                    type="text"
+                    value={agentModel}
+                    onChange={(e) => setAgentModel(e.target.value)}
+                    placeholder={AGENT_MODEL_PLACEHOLDER[agentProvider]}
+                    className="origin-input w-full font-mono text-small"
+                  />
+                </div>
+                <div>
+                  <label className="text-xsmall text-[var(--color-text-base-subdued)] block mb-[var(--space-1)]">
+                    Base URL (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={agentBaseURL}
+                    onChange={(e) => setAgentBaseURL(e.target.value)}
+                    placeholder="https://api.example.com/v1"
+                    className="origin-input w-full font-mono text-small"
+                  />
+                </div>
+              </div>
+              <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
+                Chooses the model behind the chat assistant. Leave the base URL blank to use
+                the provider's default endpoint, or point it at an OpenAI-compatible or local
+                server.
+              </p>
+            </fieldset>
+
+            <hr className="my-[var(--space-6)] border-[var(--color-border-base-subdued)]" />
+
+            <fieldset>
+              <legend className="text-small font-medium text-[var(--color-text-base-default)] mb-[var(--space-2)]">
+                What the assistant remembers
+              </legend>
+              {memoryLoading ? (
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Loading&hellip;</p>
+              ) : memory.length === 0 ? (
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Nothing saved yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-[var(--space-2)]">
+                  {memory.map((entry) => (
+                    <li
+                      key={entry.key}
+                      className="flex items-start justify-between gap-[var(--space-2)] text-small"
+                    >
+                      <span className="text-[var(--color-text-base-default)]">
+                        <span className="font-medium">{entry.key}</span>: {entry.value}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => forgetMemory(entry.key)}
+                        className="origin-btn origin-btn-secondary shrink-0"
+                      >
+                        Forget
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="text-xsmall text-[var(--color-text-base-subdued)] mt-[var(--space-2)]">
+                Facts the assistant has stored about you across conversations. Forgetting one
+                takes effect immediately.
               </p>
             </fieldset>
 
