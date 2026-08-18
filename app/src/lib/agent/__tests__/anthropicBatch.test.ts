@@ -44,4 +44,33 @@ describe('toAnthropicMessages — batched parallel tool results', () => {
       expect(b.id).toMatch(ID_RE);
     }
   });
+
+  it('heals already-stored illegal ids (dot) and keeps the pair matched', () => {
+    // A conversation persisted before the id fix: batch ids contain a '.'.
+    const messages: AgentMessage[] = [
+      { role: 'user', text: 'recategorize these' },
+      {
+        role: 'assistant',
+        toolCalls: [
+          { id: 'abc-123.0', name: 'edit_transaction_metadata', input: { id: 'x' } },
+          { id: 'abc-123.1', name: 'edit_transaction_metadata', input: { id: 'y' } },
+        ],
+      },
+      { role: 'tool', toolResult: { id: 'abc-123.0', content: 'ok' } },
+      { role: 'tool', toolResult: { id: 'abc-123.1', content: 'ok' } },
+    ];
+
+    const out = toAnthropicMessages(messages);
+    const asstIdx = out.findIndex((m) => m.role === 'assistant');
+    const useIds = (out[asstIdx].content as any[])
+      .filter((b) => b.type === 'tool_use')
+      .map((b) => b.id);
+    const resultIds = (out[asstIdx + 1].content as any[]).map((b) => b.tool_use_id);
+
+    // Sanitized to a legal pattern...
+    for (const id of [...useIds, ...resultIds]) expect(id).toMatch(ID_RE);
+    expect(useIds).toEqual(['abc-123_0', 'abc-123_1']);
+    // ...and each tool_use still matches its tool_result.
+    expect(resultIds).toEqual(useIds);
+  });
 });

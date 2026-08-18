@@ -6,13 +6,20 @@ export interface AnthropicLike {
   messages: { stream(params: unknown): AsyncIterable<any> };
 }
 
+// Anthropic requires tool_use / tool_result ids to match ^[a-zA-Z0-9_-]+$.
+// Older histories persisted batch ids containing a '.', which 400s on every
+// resend of that conversation. Normalize any illegal char to '_' at the provider
+// boundary — applied identically to a tool_use id and its matching tool_result
+// id, so the pair stays matched — which also heals already-stored bad ids.
+const sanitizeToolId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, '_');
+
 export function toAnthropicMessages(messages: AgentMessage[]) {
   const out: { role: 'user' | 'assistant'; content: unknown }[] = [];
   for (const m of messages) {
     if (m.role === 'tool') {
       const block = {
         type: 'tool_result',
-        tool_use_id: m.toolResult!.id,
+        tool_use_id: sanitizeToolId(m.toolResult!.id),
         content: m.toolResult!.content,
         is_error: m.toolResult!.isError,
       };
@@ -31,7 +38,7 @@ export function toAnthropicMessages(messages: AgentMessage[]) {
     if (m.role === 'assistant' && m.toolCalls?.length) {
       const blocks: unknown[] = [];
       if (m.text) blocks.push({ type: 'text', text: m.text });
-      for (const c of m.toolCalls) blocks.push({ type: 'tool_use', id: c.id, name: c.name, input: c.input });
+      for (const c of m.toolCalls) blocks.push({ type: 'tool_use', id: sanitizeToolId(c.id), name: c.name, input: c.input });
       out.push({ role: 'assistant', content: blocks });
       continue;
     }
