@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { getAgentKeyHeaders } from '@/lib/apiKey';
 import { notifyDataChanged } from '@/lib/dataEvents';
 import { getViewContext } from '@/app/lib/viewContext';
+import { toolLabel } from '@/lib/agent/toolLabels';
 import type { UIAffordance } from '@/lib/agent/ui';
 import type { PendingTransaction } from '@/types';
 
@@ -74,7 +75,9 @@ export function useAgentChat() {
       for (const e of events) {
         if (e.type === 'conversation') convId.current = e.conversationId;
         else if (e.type === 'progress') setProgress(e.label);
+        else if (e.type === 'tool_start') setProgress(toolLabel(e.name)); // live "step" label
         else if (e.type === 'thinking') {
+          setProgress(null); // model is reasoning now, not running a tool
           if (thinkStart.current == null) thinkStart.current = Date.now();
           setMessages((m) => {
             const c = [...m];

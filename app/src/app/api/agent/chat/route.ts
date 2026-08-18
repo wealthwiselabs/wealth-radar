@@ -320,9 +320,16 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
+        // Heartbeat: a long tool run (deep_research) can go a while with no other
+        // events; a periodic ping keeps proxies from dropping the idle connection
+        // and lets the client tell "still working" from "stream died".
+        const heartbeat = setInterval(() => {
+          try { controller.enqueue(encoder.encode(sseEncode({ type: 'ping' }))); } catch { /* closed */ }
+        }, 15000);
         try {
           await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, viewNote, conversationId, grants.get(conversationId), makeProgressEmitter(controller, encoder)), controller, encoder, conversationId, db);
         } finally {
+          clearInterval(heartbeat);
           controller.close();
         }
       },
@@ -390,9 +397,14 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       controller.enqueue(encoder.encode(sseEncode({ type: 'conversation', conversationId })));
+      // Heartbeat — see the note on the initial-message path above.
+      const heartbeat = setInterval(() => {
+        try { controller.enqueue(encoder.encode(sseEncode({ type: 'ping' }))); } catch { /* closed */ }
+      }, 15000);
       try {
         await pumpLoop(newLoop(trimHistory(history), cfg, db, req.signal, memoryText, taxonomyText, note, conversationId, grants.get(conversationId), makeProgressEmitter(controller, encoder)), controller, encoder, conversationId, db);
       } finally {
+        clearInterval(heartbeat);
         controller.close();
       }
     },
