@@ -1,8 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAgentChat } from '@/app/hooks/useAgentChat';
 import ChatPanel from './ChatPanel';
 import AssistantIcon from './AssistantIcon';
+import { clampPanelWidth } from './panelWidth';
+
+const WIDTH_STORAGE_KEY = 'wealthwise:chat-panel-width';
 
 // Right-docked assistant. The chat state lives here (not in ChatPanel) so the
 // conversation survives minimizing and reopening — the panel is always mounted
@@ -11,6 +14,45 @@ import AssistantIcon from './AssistantIcon';
 export default function AgentWidget() {
   const [open, setOpen] = useState(false);
   const chat = useAgentChat();
+
+  // On wide viewports the open panel PUSHES the page (see the padding-right
+  // effect below); on narrow it stays a full-width overlay. Track the media
+  // query live so a resize across the breakpoint switches modes.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width:1024px)');
+    setWide(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => setWide(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  // Persisted, clamped panel width (only used in wide mode). Seed from
+  // localStorage inside an effect so SSR never touches window/localStorage.
+  const [width, setWidth] = useState(400);
+  useEffect(() => {
+    const stored = Number(localStorage.getItem(WIDTH_STORAGE_KEY));
+    if (Number.isFinite(stored) && stored > 0) {
+      setWidth(clampPanelWidth(stored, window.innerWidth));
+    }
+  }, []);
+
+  // Push the page content aside by reserving room on the right while the panel
+  // is open in wide mode. Cleared when closed, narrow, or unmounted.
+  useEffect(() => {
+    const shell = document.getElementById('app-shell');
+    if (!shell) return;
+    shell.style.paddingRight = open && wide ? `${width}px` : '';
+    return () => {
+      shell.style.paddingRight = '';
+    };
+  }, [open, wide, width]);
+
+  const onWidth = (px: number) => {
+    const w = clampPanelWidth(px, window.innerWidth);
+    setWidth(w);
+    localStorage.setItem(WIDTH_STORAGE_KEY, String(w));
+  };
 
   return (
     <>
@@ -38,9 +80,17 @@ export default function AgentWidget() {
           shadow-[var(--elevation-high-shadow)]
           transition-transform duration-300 ease-out
           ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}`}
+        style={wide ? { width: `${width}px`, maxWidth: '100vw' } : undefined}
         aria-hidden={!open}
       >
-        <ChatPanel open={open} onMinimize={() => setOpen(false)} chat={chat} />
+        <ChatPanel
+          open={open}
+          onMinimize={() => setOpen(false)}
+          chat={chat}
+          wide={wide}
+          width={width}
+          onWidth={onWidth}
+        />
       </div>
     </>
   );

@@ -51,8 +51,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <ThemeSync />
-        <AppHeader />
-        {children}
+        <div id="app-shell">
+          <AppHeader />
+          {children}
+        </div>
         <AgentWidget />
       </body>
     </html>

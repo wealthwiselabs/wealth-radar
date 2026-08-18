@@ -162,6 +162,17 @@
   --elevation-high-shadow: 0 10px 15px rgba(0, 0, 0, 0.3), 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
+/* App shell — animates the push when the chat panel opens on wide viewports. */
+#app-shell {
+  transition: padding-right 300ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app-shell {
+    transition: none;
+  }
+}
+
 /* Base Styles */
 html {
   font-size: 14px; /* Origin's base font size */

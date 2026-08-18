@@ -23,10 +23,16 @@ export default function ChatPanel({
   open,
   onMinimize,
   chat,
+  wide,
+  width,
+  onWidth,
 }: {
   open: boolean;
   onMinimize: () => void;
   chat: AgentChat;
+  wide?: boolean;
+  width?: number;
+  onWidth?: (px: number) => void;
 }) {
   const { messages, affordances, streaming, send, respond, reset, notify, loadConversation } = chat;
   const [draft, setDraft] = useState('');
@@ -76,11 +82,49 @@ export default function ChatPanel({
     <div
       role="dialog"
       aria-label="Wealthwise Advisor"
-      className="flex h-full flex-col"
+      className="relative flex h-full flex-col"
       onKeyDown={(e) => {
         if (e.key === 'Escape') onMinimize();
       }}
     >
+      {wide ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize chat panel"
+          tabIndex={0}
+          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize touch-none select-none hover:bg-[var(--color-border-base-hover)]"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              onWidth?.(window.innerWidth - e.clientX);
+            }
+          }}
+          onPointerUp={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          }}
+          onPointerCancel={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            }
+          }}
+          onKeyDown={(e) => {
+            // Panel is docked right, so ArrowLeft grows it and ArrowRight shrinks it.
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              onWidth?.((width ?? 400) + 16);
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              onWidth?.((width ?? 400) - 16);
+            }
+          }}
+        />
+      ) : null}
       <header className="flex items-center gap-[var(--space-3)] border-b border-[var(--color-border-base-subdued)] px-[var(--space-4)] py-[var(--space-3)]">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-2)] bg-[var(--color-background-brand-default)] text-[var(--color-text-inverse)]">
           <AssistantIcon className="h-5 w-5" />
