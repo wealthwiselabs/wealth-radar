@@ -43,7 +43,7 @@ export default function ChatPanel({
   } | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const busy = streaming || parsing;
@@ -66,6 +66,16 @@ export default function ChatPanel({
     send(text, staged ?? undefined);
     setStaged(null);
     setDraft('');
+    // Collapse the textarea back to a single row now that it's empty.
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+  };
+
+  // Auto-grow the message textarea as the user types, up to MAX_INPUT_HEIGHT
+  // (~5 lines), then let it scroll. Shrinks back down as text is removed.
+  const MAX_INPUT_HEIGHT = 140;
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`;
   };
 
   // Attach/drop → PARSE bank-statement PDFs (extract + classify) and STAGE the
@@ -222,10 +232,12 @@ export default function ChatPanel({
         {showHistory ? (
           <HistoryView
             onOpen={(id) => {
+              setStaged(null);
               loadConversation(id);
               setShowHistory(false);
             }}
             onNew={() => {
+              setStaged(null);
               reset();
               setShowHistory(false);
             }}
@@ -282,7 +294,7 @@ export default function ChatPanel({
       ) : null}
 
       <form
-        className="flex items-center gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] p-[var(--space-3)]"
+        className="flex items-end gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] p-[var(--space-3)]"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -317,11 +329,21 @@ export default function ChatPanel({
             </svg>
           )}
         </button>
-        <input
+        <textarea
           ref={inputRef}
-          className="origin-input flex-1"
+          rows={1}
+          className="origin-input flex-1 resize-none"
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            autoGrow(e.target);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
           placeholder={parsing ? 'Reading statement…' : 'Ask about your finances…'}
           aria-label="Message"
           disabled={parsing}
@@ -366,7 +388,7 @@ function Bubble({
         className={`max-w-[85%] rounded-[var(--radius-3)] px-[var(--space-3)] py-[var(--space-2)] text-small ${
           isUser
             ? 'rounded-br-[var(--radius-1)] bg-[var(--color-background-brand-subdued)] text-[var(--color-text-base-default)]'
-            : 'rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-subdued)] text-[var(--color-text-base-default)]'
+            : 'rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-hover)] text-[var(--color-text-base-default)]'
         }`}
       >
         {isUser ? (

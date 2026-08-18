@@ -59,8 +59,7 @@ export default function HistoryView({
     };
   }, []);
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string) => {
     setConversations((c) => c.filter((conv) => conv.id !== id));
     try {
       await fetch('/api/agent/conversations', {
@@ -105,32 +104,27 @@ export default function HistoryView({
           </p>
         ) : (
           conversations.map((c) => (
-            <button
+            <div
               key={c.id}
-              type="button"
-              onClick={() => onOpen(c.id)}
-              className="origin-card flex w-full items-center gap-[var(--space-2)] px-[var(--space-3)] py-[var(--space-2)] text-left transition-colors hover:bg-[var(--color-background-base-hover)]"
+              className="origin-card flex w-full items-center gap-[var(--space-2)] px-[var(--space-3)] py-[var(--space-2)] transition-colors hover:bg-[var(--color-background-base-hover)]"
             >
-              <span className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => onOpen(c.id)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <span className="block truncate text-small text-[var(--color-text-base-default)]">
                   {c.title}
                 </span>
                 <span className="block text-xsmall text-[var(--color-text-base-subdued)]">
                   {relativeTime(c.modifiedAt)} · {c.messageCount} msgs
                 </span>
-              </span>
-              <span
-                role="button"
-                tabIndex={0}
+              </button>
+              <button
+                type="button"
                 aria-label="Delete conversation"
                 title="Delete"
-                onClick={(e) => handleDelete(e, c.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleDelete(e as unknown as React.MouseEvent, c.id);
-                  }
-                }}
+                onClick={() => handleDelete(c.id)}
                 className={iconBtn}
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -141,8 +135,8 @@ export default function HistoryView({
                     d="M6 7h12M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v13a1 1 0 01-1 1H8a1 1 0 01-1-1V7h10zM10 11v6M14 11v6"
                   />
                 </svg>
-              </span>
-            </button>
+              </button>
+            </div>
           ))
         )}
       </div>
