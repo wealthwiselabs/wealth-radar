@@ -222,7 +222,7 @@ function Bubble({
       <div
         className={`max-w-[85%] rounded-[var(--radius-3)] px-[var(--space-3)] py-[var(--space-2)] text-small ${
           isUser
-            ? 'rounded-br-[var(--radius-1)] bg-[var(--color-background-brand-default)] text-[var(--color-text-inverse)]'
+            ? 'rounded-br-[var(--radius-1)] bg-[var(--color-background-brand-subdued)] text-[var(--color-text-base-default)]'
             : 'rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-subdued)] text-[var(--color-text-base-default)]'
         }`}
       >
