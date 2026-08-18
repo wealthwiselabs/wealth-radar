@@ -334,6 +334,22 @@ export async function POST(req: NextRequest) {
   }
   const history = toAgentMessages(await getMessages(conversationId, db));
 
+  // Vision content for THIS turn only — NOT persisted (mirrors reasoning). Attach
+  // to the last user message of the in-memory history so the provider sees it now.
+  // Guardrails: at most 4 images and ~8MB of total base64; otherwise drop silently.
+  const rawImages = body.images as { mediaType: string; data: string }[] | undefined;
+  if (Array.isArray(rawImages) && rawImages.length > 0) {
+    const totalBytes = rawImages.reduce((sum, img) => sum + (img?.data?.length ?? 0), 0);
+    if (rawImages.length <= 4 && totalBytes <= 8 * 1024 * 1024) {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === 'user') {
+          history[i].images = rawImages;
+          break;
+        }
+      }
+    }
+  }
+
   // A chat-panel attachment stages a classified statement for THIS turn. Stage
   // it (keyed by conversationId so import_statement can find it) and fold a
   // compact summary into the per-turn note alongside the existing view note.

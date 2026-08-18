@@ -8,6 +8,11 @@ export interface AgentMessage {
   toolCalls?: { id: string; name: string; input: unknown }[];
   /** For role:'tool' — result of a prior call. */
   toolResult?: { id: string; content: string; isError?: boolean };
+  /**
+   * Vision content attached to a user turn for THIS request only (not persisted).
+   * `data` is raw base64 with no `data:` prefix. Anthropic provider only.
+   */
+  images?: { mediaType: string; data: string }[];
 }
 
 export interface ToolSpec {

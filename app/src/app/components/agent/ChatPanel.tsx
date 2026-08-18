@@ -41,6 +41,9 @@ export default function ChatPanel({
     fileName: string;
     transactions: PendingTransaction[];
   } | null>(null);
+  // Images attached to the NEXT user turn only (not persisted). `url` is the full
+  // data URL used for the thumbnail; `mediaType`/`data` are sent to the model.
+  const [images, setImages] = useState<{ mediaType: string; data: string; url: string }[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -60,11 +63,17 @@ export default function ChatPanel({
 
   const submit = () => {
     const text = draft.trim();
-    if (!text || busy) return;
+    // Allow sending with images even when the text box is empty (image-only turn).
+    if ((!text && images.length === 0) || busy) return;
     // The staged statement (if any) rides along with this message; the agent
     // decides whether to import it (via import_statement) or just answer.
-    send(text, staged ?? undefined);
+    send(
+      text,
+      staged ?? undefined,
+      images.length > 0 ? images.map(({ mediaType, data }) => ({ mediaType, data })) : undefined,
+    );
     setStaged(null);
+    setImages([]);
     setDraft('');
     // Collapse the textarea back to a single row now that it's empty.
     if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -104,10 +113,32 @@ export default function ChatPanel({
     }
   };
 
+  // Read one image file into a base64 attachment and append it to `images`
+  // (capped at 4). The full data URL doubles as the thumbnail preview src.
+  const readImage = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      const comma = dataUrl.indexOf(',');
+      if (comma === -1) return;
+      const data = dataUrl.slice(comma + 1);
+      setImages((prev) =>
+        prev.length >= 4 ? prev : [...prev, { mediaType: file.type, data, url: dataUrl }],
+      );
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = pdfsFromFileList(e.target.files);
+    // Route image files to the vision path; PDFs go through the existing staging
+    // path (pdfsFromFileList filters the FileList down to real PDFs on its own).
+    const picked = e.target.files ? Array.from(e.target.files) : [];
+    const pdfs = pdfsFromFileList(e.target.files);
     e.target.value = ''; // allow re-picking the same file
-    await stageFiles(files);
+    for (const f of picked) {
+      if (f.type.startsWith('image/')) readImage(f);
+    }
+    await stageFiles(pdfs);
   };
 
   return (
@@ -233,11 +264,13 @@ export default function ChatPanel({
           <HistoryView
             onOpen={(id) => {
               setStaged(null);
+              setImages([]);
               loadConversation(id);
               setShowHistory(false);
             }}
             onNew={() => {
               setStaged(null);
+              setImages([]);
               reset();
               setShowHistory(false);
             }}
@@ -273,23 +306,44 @@ export default function ChatPanel({
         )}
       </div>
 
-      {staged ? (
-        <div className="flex items-center gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] px-[var(--space-3)] pt-[var(--space-2)]">
-          <span className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-2)] bg-[var(--color-background-base-subdued)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall text-[var(--color-text-base-default)]">
-            <span className="truncate">
-              📄 {staged.fileName} — {staged.transactions.length} transaction
-              {staged.transactions.length === 1 ? '' : 's'} parsed
+      {staged || images.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-[var(--space-2)] border-t border-[var(--color-border-base-subdued)] px-[var(--space-3)] pt-[var(--space-2)]">
+          {staged ? (
+            <span className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-2)] bg-[var(--color-background-base-subdued)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall text-[var(--color-text-base-default)]">
+              <span className="truncate">
+                📄 {staged.fileName} — {staged.transactions.length} transaction
+                {staged.transactions.length === 1 ? '' : 's'} parsed
+              </span>
+              <button
+                type="button"
+                aria-label="Remove staged statement"
+                title="Remove staged statement"
+                onClick={() => setStaged(null)}
+                className="text-[var(--color-icon-base-default)] hover:text-[var(--color-text-base-default)]"
+              >
+                ✕
+              </button>
             </span>
-            <button
-              type="button"
-              aria-label="Remove staged statement"
-              title="Remove staged statement"
-              onClick={() => setStaged(null)}
-              className="text-[var(--color-icon-base-default)] hover:text-[var(--color-text-base-default)]"
-            >
-              ✕
-            </button>
-          </span>
+          ) : null}
+          {images.map((img, i) => (
+            <span key={i} className="relative inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img.url}
+                alt={`Attached image ${i + 1}`}
+                className="h-10 w-10 rounded-[var(--radius-2)] object-cover"
+              />
+              <button
+                type="button"
+                aria-label="Remove image"
+                title="Remove image"
+                onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-background-base-default)] text-xsmall leading-none text-[var(--color-icon-base-default)] shadow hover:text-[var(--color-text-base-default)]"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
         </div>
       ) : null}
 
@@ -303,7 +357,7 @@ export default function ChatPanel({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,application/pdf,image/png,image/jpeg,image/webp,image/gif"
           multiple
           onChange={handleFiles}
           className="hidden"
@@ -344,6 +398,23 @@ export default function ChatPanel({
               submit();
             }
           }}
+          onPaste={(e) => {
+            // Pull any pasted image files into the vision attachments. Only swallow
+            // the paste when at least one image was found, so plain-text paste works.
+            let found = false;
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                  readImage(file);
+                  found = true;
+                }
+              }
+            }
+            if (found) e.preventDefault();
+          }}
           placeholder={parsing ? 'Reading statement…' : 'Ask about your finances…'}
           aria-label="Message"
           disabled={parsing}
@@ -351,7 +422,7 @@ export default function ChatPanel({
         <button
           type="submit"
           aria-label="Send"
-          disabled={busy || !draft.trim()}
+          disabled={busy || (!draft.trim() && images.length === 0)}
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-2)] bg-[var(--color-background-brand-default)] text-[var(--color-text-inverse)] transition hover:brightness-110 disabled:opacity-50 disabled:pointer-events-none"
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

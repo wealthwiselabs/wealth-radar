@@ -42,6 +42,21 @@ export function toAnthropicMessages(messages: AgentMessage[]) {
       out.push({ role: 'assistant', content: blocks });
       continue;
     }
+    // A plain user turn carrying vision content emits an ARRAY of blocks (text +
+    // one image block each). Without images, keep the compact string form.
+    if (m.role === 'user' && m.images?.length) {
+      out.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: m.text ?? '' },
+          ...m.images.map((img) => ({
+            type: 'image',
+            source: { type: 'base64', media_type: img.mediaType, data: img.data },
+          })),
+        ],
+      });
+      continue;
+    }
     out.push({ role: m.role as 'user' | 'assistant', content: m.text ?? '' });
   }
   return out;

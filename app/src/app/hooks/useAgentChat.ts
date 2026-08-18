@@ -117,6 +117,7 @@ export function useAgentChat() {
     async (
       text: string,
       attachment?: { fileName: string; transactions: PendingTransaction[] },
+      images?: { mediaType: string; data: string }[],
     ) => {
       thinkStart.current = null;
       setAffordances([]);
@@ -131,6 +132,7 @@ export function useAgentChat() {
             message: text,
             viewContext: getViewContext(),
             ...(attachment ? { attachment } : {}),
+            ...(images && images.length > 0 ? { images } : {}),
           }),
         });
         await consume(res);
