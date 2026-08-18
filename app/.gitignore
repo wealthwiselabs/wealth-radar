@@ -59,6 +59,10 @@ data/snapshots/
 # overwrite, the real app.db / preferences.json.
 data/e2e/
 
+# Playwright: generated session-cookie storageState for the production-build
+# auth gate (e2e/global-setup.ts), regenerated on every run.
+e2e/.auth/
+
 # Same arrangement for the generated README-screenshot data (scripts/seed-demo.ts).
 # It is fake, but it lives outside data/ for the same reason as e2e/: so that
 # rebuilding it can never reach the real app.db or preferences.json.
