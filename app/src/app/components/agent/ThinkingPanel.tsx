@@ -25,19 +25,23 @@ export default function ThinkingPanel({
   const [open, setOpen] = useState(false);
   const active = thinkingMs == null; // still reasoning (no duration stamped yet)
   return (
-    <div className="mb-[var(--space-2)]">
+    // A tinted, bordered card so the model's reasoning reads as distinctly
+    // separate from the answer markdown that follows it in the same bubble.
+    <div className="mb-[var(--space-2)] overflow-hidden rounded-[var(--radius-2)] border border-[var(--color-border-base-subdued)] bg-[var(--color-background-accent-subdued)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-[var(--space-1)] text-xsmall text-[var(--color-text-base-subdued)] hover:text-[var(--color-text-base-default)]"
+        className="flex w-full items-center gap-[var(--space-2)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall text-[var(--color-text-base-subdued)] hover:text-[var(--color-text-base-default)]"
         aria-expanded={open}
       >
-        <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
+        <span className="font-medium">
+          ✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}
+        </span>
         {active ? <LiveDots /> : null}
-        <span aria-hidden className="text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
+        <span aria-hidden className="ml-auto text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
-        <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-3)] text-xsmall text-[var(--color-text-base-subdued)]">
+        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap border-t border-[var(--color-border-base-subdued)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall italic text-[var(--color-text-base-subdued)]">
           {thinking}
         </div>
       )}
