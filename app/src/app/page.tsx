@@ -13,6 +13,7 @@ import TrailingAverageLabel from './components/TrailingAverageLabel';
 import { useAppConfig } from './hooks/useAppConfig';
 import { useTimeRange } from './hooks/useTimeRange';
 import { usePublishViewContext } from './hooks/usePublishViewContext';
+import { usePublishSection } from '@/app/hooks/usePublishSection';
 import { PRESET_LABELS, type Preset } from '@/lib/timeRange';
 import type { Transaction, Category, DateRange } from '@/types';
 import { sumExpenses, sumIncome } from '@/lib/spending';
@@ -270,6 +271,31 @@ export default function Home() {
     };
   }, [preset, tableFilters, categories, totalExpenses, totalIncome]);
   usePublishViewContext(viewSnapshot);
+
+  const txCategory = tableFilters.categoryId
+    ? categories.find((c) => c.id === tableFilters.categoryId)?.name ?? tableFilters.categoryId
+    : undefined;
+  usePublishSection({
+    id: 'home.transactions',
+    order: 20,
+    title: 'Transactions',
+    summary: `${visibleTransactions.length} transaction(s) shown${txCategory ? ` in ${txCategory}` : ''}`,
+    detail: {
+      tool: 'list_transactions',
+      args: {
+        from: dateRange.startDate,
+        to: dateRange.endDate,
+        ...(tableFilters.categoryId ? { category: tableFilters.categoryId } : {}),
+      },
+    },
+  });
+  usePublishSection({
+    id: 'home.spending-charts',
+    order: 10,
+    title: 'Spending charts',
+    summary: 'Monthly expenses and category totals for spending accounts',
+    detail: { tool: 'query_spending' },
+  });
 
   if (isLoading) {
     return (
