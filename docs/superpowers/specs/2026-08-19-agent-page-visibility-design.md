@@ -201,8 +201,11 @@ Rules:
 All `gate:'none'`, returning `{ content: string }`, calling `@/lib/*` helpers directly.
 
 **New: `get_holdings_breakdown`** — per-account holdings breakdown + recent transactions
-(the Investments breakdown table). Wraps the same `@/lib/investments/breakdown` assembly the
-`/api/investments/breakdown` route uses.
+(the Investments breakdown table). A new `loadAccountBreakdown(scope, from, to, db)` helper
+in `@/lib/investments/read` assembles the inputs (accounts, overrides, snapshots, flows,
+securities, transactions) and calls `assembleBreakdown`; the existing
+`/api/investments/breakdown` route is refactored to call the same helper (DRY), and the tool
+calls it too — keeping raw `db.select` out of the tool layer.
 - Input: `{ account?: string ('all' or id), from?: string, to?: string }`.
 - Output: per account — name/purpose, start/end value, ROI, top holdings (ticker, value,
   %, ROI), and recent transactions.
@@ -215,12 +218,12 @@ Wraps the trend helpers behind `/api/investments/allocation/trend` and
 - Output: the time series (period label, value, roi) for the requested node/purpose.
 
 **New: `get_allocation_breakdown`** — the full nested asset-allocation tree (the
-`AllocationTree` block). Wraps `buildAllocationTree` (`@/lib/investments/allocation`), the
-same helper behind `/api/investments/allocation`.
-- Input: `{ basis?: 'monthly'|'quarterly'|'yearly', period?: string }` (period defaults to
-  the latest with data).
-- Output: the nested buckets — label, depth, balance, % of total, contributions,
-  value change, gain, ROI — rendered as an indented tree.
+`AllocationTree` block). Wraps `buildAllocationWindowTree(ctx, from, to)`
+(`@/lib/investments/allocation`), the same helper behind
+`/api/investments/allocation/range` — window-based, matching what the component renders.
+- Input: `{ from?: string, to?: string }` (from defaults to the earliest snapshot, to to today).
+- Output: the nested buckets — label, depth, balance, % of total, value change, ROI —
+  rendered as an indented tree.
 
 **New: `list_transactions`** — windowed spending-transaction listing with real paging (the
 Home transactions table; the underlying `/api/transactions` route has no paging).
@@ -245,7 +248,7 @@ Register the four new tools in the `readTools` array (`read.ts:263-270`); `allTo
 - `PortfolioTrendChart.tsx` → section `investments.trend`, summary from `chartData`,
   `detail: { tool: 'get_portfolio_trend', args: { path, basis, from, to, metric } }`.
 - `AllocationTree.tsx` → section `investments.allocation`, summary from its tree,
-  `detail: { tool: 'get_allocation_breakdown', args: { basis, period } }`.
+  `detail: { tool: 'get_allocation_breakdown', args: { from, to } }`.
 - Remaining blocks (ReturnsGrid, AccountTable, PurposeTiles) publish **summary-only**
   sections, referencing existing tools where natural (`investment_summary`,
   `query_investment_returns`). No new tools for these initially (YAGNI).
