@@ -36,7 +36,18 @@ export default function ThinkingPanel({
       >
         <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
         {active ? <LiveDots /> : null}
-        <span aria-hidden className="text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
+        <svg
+          aria-hidden
+          viewBox="0 0 16 16"
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 4 10 8 6 12" />
+        </svg>
       </button>
       {open && (
         <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-2)] italic">
