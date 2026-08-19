@@ -132,7 +132,7 @@ export const listInvestmentTransactionsTool: Tool = {
     description:
       'List recent investment activity (contributions, withdrawals, buys, sells). ' +
       'Optionally filter by account (id or label substring), date range (from/to, YYYY-MM-DD), ' +
-      'or type. Returns up to 50 rows, newest first.',
+      'or type. Newest first, with paging: use limit (default 50, max 200) and offset to page.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -140,18 +140,22 @@ export const listInvestmentTransactionsTool: Tool = {
         from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
         to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
         type: { type: 'string', description: 'Transaction type filter (e.g. buy, sell, cash)' },
+        limit: { type: 'number', description: 'Page size (default 50, max 200)' },
+        offset: { type: 'number', description: 'Rows to skip (default 0)' },
       },
       additionalProperties: false,
     },
   },
-  async run(input: { account?: string; from?: string; to?: string; type?: string }, { db }) {
+  async run(input: { account?: string; from?: string; to?: string; type?: string; limit?: number; offset?: number }, { db }) {
     const ctx = await loadAllocationContext(db);
     if (ctx.exchanges.length === 0) return { content: NO_INVESTMENT_DATA };
 
     const acct = (input.account ?? '').toLowerCase();
     const typeFilter = (input.type ?? '').toLowerCase();
+    const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
+    const offset = Math.max(Math.trunc(input.offset ?? 0), 0);
 
-    const rows = ctx.exchanges
+    const filtered = ctx.exchanges
       .filter((t) => {
         if (!acct) return true;
         const label = (ctx.accountLabels.get(t.accountId) ?? '').toLowerCase();
@@ -160,15 +164,18 @@ export const listInvestmentTransactionsTool: Tool = {
       .filter((t) => (input.from ? t.date >= input.from : true))
       .filter((t) => (input.to ? t.date <= input.to : true))
       .filter((t) => (typeFilter ? (t.type ?? '').toLowerCase() === typeFilter : true))
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 50)
-      .map((t) => {
-        const label = ctx.accountLabels.get(t.accountId) ?? t.accountId;
-        const name = t.name ? ` ${t.name}` : '';
-        return `${t.date} ${label} ${t.type} ${money(t.amount)}${name}`;
-      });
+      .sort((a, b) => b.date.localeCompare(a.date));
 
-    return { content: rows.length ? rows.join('\n') : 'No matching investment transactions.' };
+    const rows = filtered.slice(offset, offset + limit).map((t) => {
+      const label = ctx.accountLabels.get(t.accountId) ?? t.accountId;
+      const name = t.name ? ` ${t.name}` : '';
+      return `${t.date} ${label} ${t.type} ${money(t.amount)}${name}`;
+    });
+    if (rows.length === 0) return { content: 'No matching investment transactions.' };
+
+    const more = filtered.length - (offset + rows.length);
+    const footer = more > 0 ? `\n… ${more} more (use offset=${offset + limit}).` : '';
+    return { content: `${rows.join('\n')}${footer}` };
   },
 };
 
