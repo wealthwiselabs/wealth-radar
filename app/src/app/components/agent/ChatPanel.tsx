@@ -295,7 +295,7 @@ export default function ChatPanel({
                     text={m.text}
                     thinking={m.thinking}
                     thinkingMs={m.thinkingMs}
-                    streaming={streaming}
+                    streaming={isLast && streaming}
                     progress={isLast ? progress : null}
                   />
                 );
@@ -456,35 +456,41 @@ function Bubble({
   progress?: string | null;
 }) {
   const isUser = role === 'user';
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[85%] rounded-[var(--radius-3)] px-[var(--space-3)] py-[var(--space-2)] text-small ${
-          isUser
-            ? 'rounded-br-[var(--radius-1)] bg-[var(--color-background-brand-subdued)] text-[var(--color-text-base-default)]'
-            : 'rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-hover)] text-[var(--color-text-base-default)]'
-        }`}
-      >
-        {isUser ? (
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-[var(--radius-3)] rounded-br-[var(--radius-1)] bg-[var(--color-background-brand-subdued)] px-[var(--space-3)] py-[var(--space-2)] text-small text-[var(--color-text-base-default)]">
           <span className="whitespace-pre-wrap">{text}</span>
-        ) : (
-          <>
-            {thinking ? (
-              <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} />
-            ) : null}
-            {text ? (
-              <MarkdownMessage text={text} />
-            ) : progress ? (
-              <span className="flex items-center gap-[var(--space-2)] py-1 text-xsmall text-[var(--color-text-base-subdued)]">
-                <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                {progress}
-              </span>
-            ) : streaming && !thinking ? (
-              <TypingDots />
-            ) : null}
-          </>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  // The answer body: the response markdown, a slow-tool progress label, or the
+  // pre-first-token typing dots. Null when there's nothing to show yet (e.g. the
+  // model is still reasoning — the ThinkingPanel above carries the "alive" signal).
+  const answer = text ? (
+    <MarkdownMessage text={text} />
+  ) : progress ? (
+    <span className="flex items-center gap-[var(--space-2)] py-1 text-xsmall text-[var(--color-text-base-subdued)]">
+      <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      {progress}
+    </span>
+  ) : streaming && !thinking ? (
+    <TypingDots />
+  ) : null;
+
+  // Reasoning renders as its own understated row ABOVE the answer bubble, not
+  // inside it — so thinking reads as a separate, secondary message.
+  return (
+    <div className="flex flex-col items-start gap-[var(--space-1)]">
+      {thinking ? <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} live={streaming} /> : null}
+      {answer !== null ? (
+        <div className="max-w-[85%] rounded-[var(--radius-3)] rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-hover)] px-[var(--space-3)] py-[var(--space-2)] text-small text-[var(--color-text-base-default)]">
+          {answer}
+        </div>
+      ) : null}
     </div>
   );
 }

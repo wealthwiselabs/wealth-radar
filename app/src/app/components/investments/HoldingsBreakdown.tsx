@@ -5,6 +5,7 @@ import { formatCurrency, formatPercent } from '@/lib/chartConfig';
 import { ASSET_TYPES, REGIONS, CAPS, STYLES, SECTORS } from '@/lib/investments/tagVocab';
 import { PURPOSES, type Purpose } from '@/lib/investments/purpose';
 import type { AccountBreakdown } from '@/lib/investments/breakdown';
+import { usePublishSection } from '@/app/hooks/usePublishSection';
 
 interface BreakdownResponse { breakdown: AccountBreakdown[]; accounts: { id: string; name: string }[] }
 type Holding = AccountBreakdown['holdings'][number];
@@ -258,6 +259,20 @@ export default function HoldingsBreakdown({ from, to }: { from: string; to: stri
   }, [account, from, to]);
 
   useEffect(() => { void load(); }, [load]);
+
+  usePublishSection(
+    entry
+      ? {
+          id: 'investments.holdings',
+          order: 30,
+          title: 'Holdings breakdown',
+          summary: `${accounts.length} account(s); showing ${entry.accountName}: ${
+            entry.endValue == null ? '—' : `$${entry.endValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+          }, ${entry.holdings.length} holding(s)`,
+          detail: { tool: 'get_holdings_breakdown', args: { account: 'all', from, to } },
+        }
+      : null,
+  );
 
   return (
     <div className="origin-card-elevated p-[var(--space-4)]">

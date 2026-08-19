@@ -18,26 +18,48 @@ function LiveDots() {
 }
 
 export default function ThinkingPanel({
-  thinking, thinkingMs,
-}: { thinking: string; thinkingMs?: number }) {
+  thinking, thinkingMs, live = false,
+}: { thinking: string; thinkingMs?: number; live?: boolean }) {
   // Collapsed by default — the animated "Thinking…" chip shows it's working; the
-  // user expands to watch the reasoning stream if they want to.
+  // user expands to watch the reasoning stream if they want to. Rendered as its
+  // own understated line above the answer bubble (not inside it), so reasoning
+  // reads as a separate, secondary message rather than part of the response.
   const [open, setOpen] = useState(false);
-  const active = thinkingMs == null; // still reasoning (no duration stamped yet)
+  // Only the live, still-streaming turn shows the animated "Thinking…" dots.
+  // Tying this to `live` (not just an unstamped duration) guarantees the dots
+  // stop when the turn ends, even if the timing stamp was missed or the message
+  // came from loaded history.
+  const active = live && thinkingMs == null;
+  const label = active
+    ? 'Thinking'
+    : thinkingMs != null
+      ? `Thought for ${formatThoughtDuration(thinkingMs)}`
+      : 'Thought';
   return (
-    <div className="mb-[var(--space-2)]">
+    <div className="text-xsmall text-[var(--color-text-base-subdued)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-[var(--space-1)] text-xsmall text-[var(--color-text-base-subdued)] hover:text-[var(--color-text-base-default)]"
+        className="inline-flex items-center gap-[var(--space-1)] hover:text-[var(--color-text-base-default)]"
         aria-expanded={open}
       >
-        <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
+        <span>✨ {label}</span>
         {active ? <LiveDots /> : null}
-        <span aria-hidden>{open ? '▾' : '▸'}</span>
+        <svg
+          aria-hidden
+          viewBox="0 0 16 16"
+          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 4 10 8 6 12" />
+        </svg>
       </button>
       {open && (
-        <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-3)] text-xsmall text-[var(--color-text-base-subdued)]">
+        <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-2)] italic">
           {thinking}
         </div>
       )}

@@ -12,6 +12,7 @@ import {
   periodOverPeriodChange,
   type Series,
 } from '@/lib/investments/portfolioTrend';
+import { usePublishSection } from '@/app/hooks/usePublishSection';
 
 export type TrendMetric = 'value' | 'roi';
 
@@ -225,6 +226,19 @@ export default function PortfolioTrendChart({
       },
     }),
     [metric, pctChange, basis],
+  );
+
+  usePublishSection(
+    merged
+      ? {
+          id: 'investments.trend',
+          order: 10,
+          title: 'Portfolio trend',
+          summary: `${merged.series.length} series (${merged.series.map((s) => s.label).join(', ')}); ${
+            merged.labels[0] ?? ''}–${merged.labels[merged.labels.length - 1] ?? ''}; metric ${metric}`,
+          detail: { tool: 'get_portfolio_trend', args: { basis, from, to, metric } },
+        }
+      : null,
   );
 
   return (

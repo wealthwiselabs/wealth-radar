@@ -4,8 +4,16 @@ import {
   loadAllocationContext,
   loadPortfolioContext,
   listReserveFlows,
+  loadAccountBreakdown,
 } from '@/lib/investments/read';
-import { householdValueAt, allocationValueAt } from '@/lib/investments/allocation';
+import {
+  householdValueAt,
+  allocationValueAt,
+  buildAllocationWindowTree,
+  earliestSnapshotDate,
+  nodeTrendSeries,
+  type AllocNode,
+} from '@/lib/investments/allocation';
 import { purposeReturnBetween } from '@/lib/investments/series';
 import type { Purpose } from '@/lib/investments/purpose';
 import type { Tool } from './types';
@@ -124,7 +132,7 @@ export const listInvestmentTransactionsTool: Tool = {
     description:
       'List recent investment activity (contributions, withdrawals, buys, sells). ' +
       'Optionally filter by account (id or label substring), date range (from/to, YYYY-MM-DD), ' +
-      'or type. Returns up to 50 rows, newest first.',
+      'or type. Newest first, with paging: use limit (default 50, max 200) and offset to page.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -132,18 +140,22 @@ export const listInvestmentTransactionsTool: Tool = {
         from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
         to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
         type: { type: 'string', description: 'Transaction type filter (e.g. buy, sell, cash)' },
+        limit: { type: 'number', description: 'Page size (default 50, max 200)' },
+        offset: { type: 'number', description: 'Rows to skip (default 0)' },
       },
       additionalProperties: false,
     },
   },
-  async run(input: { account?: string; from?: string; to?: string; type?: string }, { db }) {
+  async run(input: { account?: string; from?: string; to?: string; type?: string; limit?: number; offset?: number }, { db }) {
     const ctx = await loadAllocationContext(db);
     if (ctx.exchanges.length === 0) return { content: NO_INVESTMENT_DATA };
 
     const acct = (input.account ?? '').toLowerCase();
     const typeFilter = (input.type ?? '').toLowerCase();
+    const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
+    const offset = Math.max(Math.trunc(input.offset ?? 0), 0);
 
-    const rows = ctx.exchanges
+    const filtered = ctx.exchanges
       .filter((t) => {
         if (!acct) return true;
         const label = (ctx.accountLabels.get(t.accountId) ?? '').toLowerCase();
@@ -152,15 +164,18 @@ export const listInvestmentTransactionsTool: Tool = {
       .filter((t) => (input.from ? t.date >= input.from : true))
       .filter((t) => (input.to ? t.date <= input.to : true))
       .filter((t) => (typeFilter ? (t.type ?? '').toLowerCase() === typeFilter : true))
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 50)
-      .map((t) => {
-        const label = ctx.accountLabels.get(t.accountId) ?? t.accountId;
-        const name = t.name ? ` ${t.name}` : '';
-        return `${t.date} ${label} ${t.type} ${money(t.amount)}${name}`;
-      });
+      .sort((a, b) => b.date.localeCompare(a.date));
 
-    return { content: rows.length ? rows.join('\n') : 'No matching investment transactions.' };
+    const rows = filtered.slice(offset, offset + limit).map((t) => {
+      const label = ctx.accountLabels.get(t.accountId) ?? t.accountId;
+      const name = t.name ? ` ${t.name}` : '';
+      return `${t.date} ${label} ${t.type} ${money(t.amount)}${name}`;
+    });
+    if (rows.length === 0) return { content: 'No matching investment transactions.' };
+
+    const more = filtered.length - (offset + rows.length);
+    const footer = more > 0 ? `\n… ${more} more (use offset=${offset + limit}).` : '';
+    return { content: `${rows.join('\n')}${footer}` };
   },
 };
 
@@ -260,6 +275,178 @@ export const queryReserveTool: Tool = {
   },
 };
 
+function fmtReturn(r: { kind: 'ok'; value: number } | { kind: 'missing'; reason: string }): string {
+  return r.kind === 'ok' ? `${(r.value * 100).toFixed(2)}%` : `n/a (${r.reason})`;
+}
+
+export const getHoldingsBreakdownTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_holdings_breakdown',
+    description:
+      'Show the per-account investment breakdown that appears in the Holdings table: each ' +
+      "account's start/end value and return, its holdings (ticker, value, % of account, return), " +
+      'and recent transactions. Optionally filter by account (id or "all") and date range (from/to, YYYY-MM-DD).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Account id, or "all" (default)' },
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { account?: string; from?: string; to?: string }, { db }) {
+    const scope = input.account && input.account.trim() ? input.account.trim() : 'all';
+    const { breakdown } = await loadAccountBreakdown(scope, input.from, input.to, db);
+    if (breakdown.length === 0) return { content: NO_INVESTMENT_DATA };
+
+    const lines: string[] = [];
+    for (const acct of breakdown) {
+      const end = acct.endValue === null ? 'unknown' : money(acct.endValue);
+      lines.push(`${acct.accountName} [${acct.accountPurpose}] — value ${end} as of ${acct.endAsOf ?? 'n/a'}, return ${fmtReturn(acct.roi)}`);
+      for (const h of acct.holdings.slice(0, 15)) {
+        const tick = h.ticker ?? h.name;
+        lines.push(`  ${tick}: ${money(h.value)} (${(h.pct * 100).toFixed(1)}%) return ${fmtReturn(h.roi)}`);
+      }
+      if (acct.transactions.length) {
+        lines.push('  Recent transactions:');
+        for (const t of acct.transactions.slice(0, 15)) {
+          const tick = t.ticker ? ` ${t.ticker}` : '';
+          lines.push(`    ${t.date} ${t.type}${tick} ${money(t.amount)}`);
+        }
+      }
+    }
+    return { content: lines.join('\n') };
+  },
+};
+
+function renderAllocNode(node: AllocNode, lines: string[]): void {
+  const indent = '  '.repeat(node.depth);
+  const bal = node.balance === null ? 'unknown' : money(node.balance);
+  const pct = node.pctOfTotal === null ? '' : ` (${(node.pctOfTotal * 100).toFixed(1)}%)`;
+  lines.push(`${indent}${node.label}: ${bal}${pct} return ${fmtReturn(node.roi)}`);
+  for (const child of node.children) renderAllocNode(child, lines);
+}
+
+export const getAllocationBreakdownTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_allocation_breakdown',
+    description:
+      'Show the nested asset-allocation tree that appears in the Allocation panel: each bucket ' +
+      'and sub-bucket with its balance, share of total, and return over a window (from/to, YYYY-MM-DD; ' +
+      'defaults to the earliest snapshot through today).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { from?: string; to?: string }, { db }) {
+    const ctx = await loadAllocationContext(db);
+    if (ctx.snapshots.length === 0) return { content: NO_INVESTMENT_DATA };
+    const today = new Date().toISOString().slice(0, 10);
+    const from = input.from || earliestSnapshotDate(ctx, today);
+    const to = input.to || today;
+    const tree = buildAllocationWindowTree(ctx, from, to);
+    const lines: string[] = [];
+    renderAllocNode(tree, lines);
+    return { content: lines.join('\n') };
+  },
+};
+
+export const getPortfolioTrendTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_portfolio_trend',
+    description:
+      'Return the value/return time series behind the portfolio trend chart. Optionally target a ' +
+      'purpose (portfolio | reserve | insurance | education) or an allocation node path (slash-delimited, ' +
+      'e.g. "Stock/US"), choose basis (monthly | quarterly | yearly, default quarterly), a date range ' +
+      '(from/to, YYYY-MM-DD), and metric (value | roi, default value).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        purpose: { type: 'string', description: 'portfolio | reserve | insurance | education' },
+        path: { type: 'string', description: 'Slash-delimited allocation node path' },
+        basis: { type: 'string', description: 'monthly | quarterly | yearly' },
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+        metric: { type: 'string', description: 'value | roi' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { purpose?: string; path?: string; basis?: string; from?: string; to?: string; metric?: string }, { db }) {
+    const ctx = await loadAllocationContext(db);
+    if (ctx.snapshots.length === 0) return { content: NO_INVESTMENT_DATA };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const basis = (['monthly', 'quarterly', 'yearly'].includes(input.basis ?? '') ? input.basis : 'quarterly') as 'monthly' | 'quarterly' | 'yearly';
+    const path = input.path ? input.path.split('/').filter(Boolean) : [];
+    const targets = (input.purpose ? [input.purpose] : ['portfolio']) as Purpose[];
+    const from = input.from || earliestSnapshotDate(ctx, today);
+    const to = input.to || today;
+    const metric = input.metric === 'roi' ? 'roi' : 'value';
+
+    const points = nodeTrendSeries(ctx, path, basis, from, to, targets).filter((p) => p.startDate <= today);
+    if (points.length === 0) return { content: 'No trend data in range.' };
+
+    const lines = points.map((p) => {
+      if (metric === 'roi') {
+        return `${p.label}: ${p.roi === null ? 'n/a' : `${(p.roi * 100).toFixed(2)}%`}`;
+      }
+      return `${p.label}: ${p.value === null ? 'unknown' : money(p.value)}`;
+    });
+    return { content: lines.join('\n') };
+  },
+};
+
+export const listTransactionsTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'list_transactions',
+    description:
+      'List spending/income transactions (the Home transactions table), newest first, with paging. ' +
+      'Optionally filter by date range (from/to, YYYY-MM-DD) and category (case-insensitive substring of ' +
+      'the category or subcategory id). Use limit (default 50, max 200) and offset to page.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+        category: { type: 'string', description: 'Category/subcategory id substring' },
+        limit: { type: 'number', description: 'Page size (default 50, max 200)' },
+        offset: { type: 'number', description: 'Rows to skip (default 0)' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { from?: string; to?: string; category?: string; limit?: number; offset?: number }, { db }) {
+    const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
+    const offset = Math.max(Math.trunc(input.offset ?? 0), 0);
+    const cat = (input.category ?? '').toLowerCase();
+
+    const all = (await readTransactions(db))
+      .filter((t) => (input.from ? t.date >= input.from : true))
+      .filter((t) => (input.to ? t.date <= input.to : true))
+      .filter((t) => (cat ? t.categoryId.toLowerCase().includes(cat) || t.subcategoryId.toLowerCase().includes(cat) : true));
+
+    const page = all.slice(offset, offset + limit)
+      .map((t) => `${t.date} ${t.description} ${t.amount} [${t.categoryId}/${t.subcategoryId}] id=${t.id}`);
+    if (page.length === 0) return { content: 'No matching transactions.' };
+
+    const more = all.length - (offset + page.length);
+    const footer = more > 0 ? `\n… ${more} more (use offset=${offset + limit}).` : '';
+    return { content: `${page.join('\n')}${footer}` };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -267,4 +454,8 @@ export const readTools: Tool[] = [
   listInvestmentTransactionsTool,
   queryInvestmentReturnsTool,
   queryReserveTool,
+  getHoldingsBreakdownTool,
+  getAllocationBreakdownTool,
+  getPortfolioTrendTool,
+  listTransactionsTool,
 ];

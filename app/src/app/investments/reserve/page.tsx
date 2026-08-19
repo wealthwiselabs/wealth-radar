@@ -7,6 +7,7 @@ import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
 import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
+import { usePublishSection } from '@/app/hooks/usePublishSection';
 import { PRESET_LABELS } from '@/lib/timeRange';
 import { formatPercent, CHART_NEUTRAL } from '@/lib/chartConfig';
 
@@ -107,6 +108,29 @@ export default function ReservePage() {
     ],
   }), [preset, value]);
   usePublishViewContext(error ? null : viewSnapshot);
+
+  usePublishSection(
+    !error && points.length > 0
+      ? {
+          id: 'reserve.trend',
+          order: 10,
+          title: 'Cash reserve trend',
+          summary: `Balance ${value == null ? '—' : `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}; ${points.length} points`,
+          detail: { tool: 'get_portfolio_trend', args: { purpose: 'reserve', from: dateRange.startDate, to: dateRange.endDate } },
+        }
+      : null,
+  );
+  usePublishSection(
+    !error
+      ? {
+          id: 'reserve.flows',
+          order: 20,
+          title: 'Reserve flows',
+          summary: 'Reserve contributions and withdrawals over the selected range',
+          detail: { tool: 'query_reserve', args: { from: dateRange.startDate, to: dateRange.endDate } },
+        }
+      : null,
+  );
 
   return (
     <main className="min-h-screen p-[var(--space-6)] max-w-6xl mx-auto">

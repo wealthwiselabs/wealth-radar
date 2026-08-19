@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { formatCurrency, formatPercent } from '@/lib/chartConfig';
 import type { AllocNode } from '@/lib/investments/allocation';
 import type { PeriodReturn } from '@/lib/investments/returns';
+import { usePublishSection } from '@/app/hooks/usePublishSection';
 
 interface AllocationResponse {
   tree: AllocNode | null;
@@ -204,6 +205,22 @@ export default function AllocationTree({ from, to }: { from: string; to: string 
   };
 
   const tree = data?.tree ?? null;
+
+  usePublishSection(
+    tree
+      ? {
+          id: 'investments.allocation',
+          order: 20,
+          title: 'Asset allocation',
+          summary: `Total ${tree.balance == null ? '—' : `$${tree.balance.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}; ${
+            tree.children
+              .slice(0, 3)
+              .map((c) => `${c.label} ${c.pctOfTotal == null ? '—' : `${(c.pctOfTotal * 100).toFixed(0)}%`}`)
+              .join(', ')}`,
+          detail: { tool: 'get_allocation_breakdown', args: { from, to } },
+        }
+      : null,
+  );
 
   return (
     <div className="origin-card-elevated p-[var(--space-4)]">
