@@ -21,27 +21,25 @@ export default function ThinkingPanel({
   thinking, thinkingMs,
 }: { thinking: string; thinkingMs?: number }) {
   // Collapsed by default — the animated "Thinking…" chip shows it's working; the
-  // user expands to watch the reasoning stream if they want to.
+  // user expands to watch the reasoning stream if they want to. Rendered as its
+  // own understated line above the answer bubble (not inside it), so reasoning
+  // reads as a separate, secondary message rather than part of the response.
   const [open, setOpen] = useState(false);
   const active = thinkingMs == null; // still reasoning (no duration stamped yet)
   return (
-    // A tinted, bordered card so the model's reasoning reads as distinctly
-    // separate from the answer markdown that follows it in the same bubble.
-    <div className="mb-[var(--space-2)] overflow-hidden rounded-[var(--radius-2)] border border-[var(--color-border-base-subdued)] bg-[var(--color-background-accent-subdued)]">
+    <div className="text-xsmall text-[var(--color-text-base-subdued)]">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-[var(--space-2)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall text-[var(--color-text-base-subdued)] hover:text-[var(--color-text-base-default)]"
+        className="inline-flex items-center gap-[var(--space-1)] hover:text-[var(--color-text-base-default)]"
         aria-expanded={open}
       >
-        <span className="font-medium">
-          ✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}
-        </span>
+        <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
         {active ? <LiveDots /> : null}
-        <span aria-hidden className="ml-auto text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
+        <span aria-hidden className="text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
-        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap border-t border-[var(--color-border-base-subdued)] px-[var(--space-2)] py-[var(--space-1)] text-xsmall italic text-[var(--color-text-base-subdued)]">
+        <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-2)] italic">
           {thinking}
         </div>
       )}
