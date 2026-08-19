@@ -400,6 +400,46 @@ export const getPortfolioTrendTool: Tool = {
   },
 };
 
+export const listTransactionsTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'list_transactions',
+    description:
+      'List spending/income transactions (the Home transactions table), newest first, with paging. ' +
+      'Optionally filter by date range (from/to, YYYY-MM-DD) and category (case-insensitive substring of ' +
+      'the category or subcategory id). Use limit (default 50, max 200) and offset to page.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+        category: { type: 'string', description: 'Category/subcategory id substring' },
+        limit: { type: 'number', description: 'Page size (default 50, max 200)' },
+        offset: { type: 'number', description: 'Rows to skip (default 0)' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { from?: string; to?: string; category?: string; limit?: number; offset?: number }, { db }) {
+    const limit = Math.min(Math.max(Math.trunc(input.limit ?? 50), 1), 200);
+    const offset = Math.max(Math.trunc(input.offset ?? 0), 0);
+    const cat = (input.category ?? '').toLowerCase();
+
+    const all = (await readTransactions(db))
+      .filter((t) => (input.from ? t.date >= input.from : true))
+      .filter((t) => (input.to ? t.date <= input.to : true))
+      .filter((t) => (cat ? t.categoryId.toLowerCase().includes(cat) || t.subcategoryId.toLowerCase().includes(cat) : true));
+
+    const page = all.slice(offset, offset + limit)
+      .map((t) => `${t.date} ${t.description} ${t.amount} [${t.categoryId}/${t.subcategoryId}] id=${t.id}`);
+    if (page.length === 0) return { content: 'No matching transactions.' };
+
+    const more = all.length - (offset + page.length);
+    const footer = more > 0 ? `\n… ${more} more (use offset=${offset + limit}).` : '';
+    return { content: `${page.join('\n')}${footer}` };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -410,4 +450,5 @@ export const readTools: Tool[] = [
   getHoldingsBreakdownTool,
   getAllocationBreakdownTool,
   getPortfolioTrendTool,
+  listTransactionsTool,
 ];

@@ -83,6 +83,7 @@ describe('readTools', () => {
       'get_portfolio_trend',
       'investment_summary',
       'list_investment_transactions',
+      'list_transactions',
       'query_investment_returns',
       'query_reserve',
       'query_spending',
