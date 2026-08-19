@@ -18,14 +18,23 @@ function LiveDots() {
 }
 
 export default function ThinkingPanel({
-  thinking, thinkingMs,
-}: { thinking: string; thinkingMs?: number }) {
+  thinking, thinkingMs, live = false,
+}: { thinking: string; thinkingMs?: number; live?: boolean }) {
   // Collapsed by default — the animated "Thinking…" chip shows it's working; the
   // user expands to watch the reasoning stream if they want to. Rendered as its
   // own understated line above the answer bubble (not inside it), so reasoning
   // reads as a separate, secondary message rather than part of the response.
   const [open, setOpen] = useState(false);
-  const active = thinkingMs == null; // still reasoning (no duration stamped yet)
+  // Only the live, still-streaming turn shows the animated "Thinking…" dots.
+  // Tying this to `live` (not just an unstamped duration) guarantees the dots
+  // stop when the turn ends, even if the timing stamp was missed or the message
+  // came from loaded history.
+  const active = live && thinkingMs == null;
+  const label = active
+    ? 'Thinking'
+    : thinkingMs != null
+      ? `Thought for ${formatThoughtDuration(thinkingMs)}`
+      : 'Thought';
   return (
     <div className="text-xsmall text-[var(--color-text-base-subdued)]">
       <button
@@ -34,7 +43,7 @@ export default function ThinkingPanel({
         className="inline-flex items-center gap-[var(--space-1)] hover:text-[var(--color-text-base-default)]"
         aria-expanded={open}
       >
-        <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
+        <span>✨ {label}</span>
         {active ? <LiveDots /> : null}
         <svg
           aria-hidden

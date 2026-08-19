@@ -295,7 +295,7 @@ export default function ChatPanel({
                     text={m.text}
                     thinking={m.thinking}
                     thinkingMs={m.thinkingMs}
-                    streaming={streaming}
+                    streaming={isLast && streaming}
                     progress={isLast ? progress : null}
                   />
                 );
@@ -485,7 +485,7 @@ function Bubble({
   // inside it — so thinking reads as a separate, secondary message.
   return (
     <div className="flex flex-col items-start gap-[var(--space-1)]">
-      {thinking ? <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} /> : null}
+      {thinking ? <ThinkingPanel thinking={thinking} thinkingMs={thinkingMs} live={streaming} /> : null}
       {answer !== null ? (
         <div className="max-w-[85%] rounded-[var(--radius-3)] rounded-bl-[var(--radius-1)] bg-[var(--color-background-base-hover)] px-[var(--space-3)] py-[var(--space-2)] text-small text-[var(--color-text-base-default)]">
           {answer}
