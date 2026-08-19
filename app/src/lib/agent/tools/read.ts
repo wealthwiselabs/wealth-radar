@@ -11,6 +11,7 @@ import {
   allocationValueAt,
   buildAllocationWindowTree,
   earliestSnapshotDate,
+  nodeTrendSeries,
   type AllocNode,
 } from '@/lib/investments/allocation';
 import { purposeReturnBetween } from '@/lib/investments/series';
@@ -352,6 +353,53 @@ export const getAllocationBreakdownTool: Tool = {
   },
 };
 
+export const getPortfolioTrendTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_portfolio_trend',
+    description:
+      'Return the value/return time series behind the portfolio trend chart. Optionally target a ' +
+      'purpose (portfolio | reserve | insurance | education) or an allocation node path (slash-delimited, ' +
+      'e.g. "Stock/US"), choose basis (monthly | quarterly | yearly, default quarterly), a date range ' +
+      '(from/to, YYYY-MM-DD), and metric (value | roi, default value).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        purpose: { type: 'string', description: 'portfolio | reserve | insurance | education' },
+        path: { type: 'string', description: 'Slash-delimited allocation node path' },
+        basis: { type: 'string', description: 'monthly | quarterly | yearly' },
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+        metric: { type: 'string', description: 'value | roi' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { purpose?: string; path?: string; basis?: string; from?: string; to?: string; metric?: string }, { db }) {
+    const ctx = await loadAllocationContext(db);
+    if (ctx.snapshots.length === 0) return { content: NO_INVESTMENT_DATA };
+
+    const today = new Date().toISOString().slice(0, 10);
+    const basis = (['monthly', 'quarterly', 'yearly'].includes(input.basis ?? '') ? input.basis : 'quarterly') as 'monthly' | 'quarterly' | 'yearly';
+    const path = input.path ? input.path.split('/').filter(Boolean) : [];
+    const targets = (input.purpose ? [input.purpose] : ['portfolio']) as Purpose[];
+    const from = input.from || earliestSnapshotDate(ctx, today);
+    const to = input.to || today;
+    const metric = input.metric === 'roi' ? 'roi' : 'value';
+
+    const points = nodeTrendSeries(ctx, path, basis, from, to, targets).filter((p) => p.startDate <= today);
+    if (points.length === 0) return { content: 'No trend data in range.' };
+
+    const lines = points.map((p) => {
+      if (metric === 'roi') {
+        return `${p.label}: ${p.roi === null ? 'n/a' : `${(p.roi * 100).toFixed(2)}%`}`;
+      }
+      return `${p.label}: ${p.value === null ? 'unknown' : money(p.value)}`;
+    });
+    return { content: lines.join('\n') };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -361,4 +409,5 @@ export const readTools: Tool[] = [
   queryReserveTool,
   getHoldingsBreakdownTool,
   getAllocationBreakdownTool,
+  getPortfolioTrendTool,
 ];

@@ -80,6 +80,7 @@ describe('readTools', () => {
     expect(readTools.map((t) => t.spec.name).sort()).toEqual([
       'get_allocation_breakdown',
       'get_holdings_breakdown',
+      'get_portfolio_trend',
       'investment_summary',
       'list_investment_transactions',
       'query_investment_returns',
