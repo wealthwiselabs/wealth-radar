@@ -34,7 +34,7 @@ export default function ThinkingPanel({
       >
         <span>✨ {active ? 'Thinking' : `Thought for ${formatThoughtDuration(thinkingMs!)}`}</span>
         {active ? <LiveDots /> : null}
-        <span aria-hidden>{open ? '▾' : '▸'}</span>
+        <span aria-hidden className="text-[1rem] leading-none">{open ? '▾' : '▸'}</span>
       </button>
       {open && (
         <div className="mt-[var(--space-1)] max-h-40 overflow-y-auto whitespace-pre-wrap border-l-2 border-[var(--color-border-base-subdued)] pl-[var(--space-3)] text-xsmall text-[var(--color-text-base-subdued)]">

@@ -66,6 +66,7 @@ export function useAgentChat() {
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
     let buf = '';
+    let ended = false; // saw the server's terminal `done` frame
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -74,6 +75,7 @@ export function useAgentChat() {
       buf = rest;
       for (const e of events) {
         if (e.type === 'conversation') convId.current = e.conversationId;
+        else if (e.type === 'done') { ended = true; break; } // model finished — stop now, don't wait for socket EOF
         else if (e.type === 'progress') setProgress(e.label);
         else if (e.type === 'tool_start') setProgress(toolLabel(e.name)); // live "step" label
         else if (e.type === 'thinking') {
@@ -114,9 +116,13 @@ export function useAgentChat() {
           });
         }
       }
+      if (ended) break;
     }
-    // Stream ended cleanly (loop exit) — stamp any still-open thinking timer so a
-    // thinking-only turn still shows a duration, and drop any tool-progress label.
+    // On the terminal `done` frame the socket may stay open briefly (keep-alive
+    // ping, proxy buffering); release the reader so we don't hang on EOF.
+    if (ended) await reader.cancel().catch(() => {});
+    // Stream ended (done frame or clean EOF) — stamp any still-open thinking timer
+    // so a thinking-only turn still shows a duration, and drop any tool-progress label.
     finalizeThinking();
     setProgress(null);
   }, [finalizeThinking]);
