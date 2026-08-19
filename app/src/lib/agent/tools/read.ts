@@ -6,7 +6,13 @@ import {
   listReserveFlows,
   loadAccountBreakdown,
 } from '@/lib/investments/read';
-import { householdValueAt, allocationValueAt } from '@/lib/investments/allocation';
+import {
+  householdValueAt,
+  allocationValueAt,
+  buildAllocationWindowTree,
+  earliestSnapshotDate,
+  type AllocNode,
+} from '@/lib/investments/allocation';
 import { purposeReturnBetween } from '@/lib/investments/series';
 import type { Purpose } from '@/lib/investments/purpose';
 import type { Tool } from './types';
@@ -308,6 +314,44 @@ export const getHoldingsBreakdownTool: Tool = {
   },
 };
 
+function renderAllocNode(node: AllocNode, lines: string[]): void {
+  const indent = '  '.repeat(node.depth);
+  const bal = node.balance === null ? 'unknown' : money(node.balance);
+  const pct = node.pctOfTotal === null ? '' : ` (${(node.pctOfTotal * 100).toFixed(1)}%)`;
+  lines.push(`${indent}${node.label}: ${bal}${pct} return ${fmtReturn(node.roi)}`);
+  for (const child of node.children) renderAllocNode(child, lines);
+}
+
+export const getAllocationBreakdownTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_allocation_breakdown',
+    description:
+      'Show the nested asset-allocation tree that appears in the Allocation panel: each bucket ' +
+      'and sub-bucket with its balance, share of total, and return over a window (from/to, YYYY-MM-DD; ' +
+      'defaults to the earliest snapshot through today).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { from?: string; to?: string }, { db }) {
+    const ctx = await loadAllocationContext(db);
+    if (ctx.snapshots.length === 0) return { content: NO_INVESTMENT_DATA };
+    const today = new Date().toISOString().slice(0, 10);
+    const from = input.from || earliestSnapshotDate(ctx, today);
+    const to = input.to || today;
+    const tree = buildAllocationWindowTree(ctx, from, to);
+    const lines: string[] = [];
+    renderAllocNode(tree, lines);
+    return { content: lines.join('\n') };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -316,4 +360,5 @@ export const readTools: Tool[] = [
   queryInvestmentReturnsTool,
   queryReserveTool,
   getHoldingsBreakdownTool,
+  getAllocationBreakdownTool,
 ];

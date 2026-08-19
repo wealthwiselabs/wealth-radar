@@ -78,6 +78,7 @@ describe('querySpendingTool', () => {
 describe('readTools', () => {
   it('exports the read tools (transactions + spending + investments)', () => {
     expect(readTools.map((t) => t.spec.name).sort()).toEqual([
+      'get_allocation_breakdown',
       'get_holdings_breakdown',
       'investment_summary',
       'list_investment_transactions',
