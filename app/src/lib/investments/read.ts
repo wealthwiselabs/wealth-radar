@@ -5,6 +5,7 @@ import type { Purpose, PurposeOverride } from '@/lib/investments/purpose';
 import type { FlowRow } from '@/lib/investments/transfers';
 import type { GridContext, GridAccount } from '@/lib/investments/grid';
 import type { AllocContext, TagSet } from '@/lib/investments/allocation';
+import { assembleBreakdown, type AccountBreakdown, type RawTxn, type SecurityMeta } from '@/lib/investments/breakdown';
 
 type Db = ReturnType<typeof getDb>;
 
@@ -138,4 +139,46 @@ export async function listReserveFlows(from: string, to: string, db: Db = getDb(
       date: f.date, amount: f.amount, kind: f.kind, note: f.note,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/**
+ * Assemble the per-account investment breakdown (holdings + transactions) over a
+ * window. `scope` is an account id or 'all'. `from`/`to` default to the earliest
+ * snapshot and today. Shared by the breakdown API route and the agent tool.
+ */
+export async function loadAccountBreakdown(
+  scope: string,
+  from: string | undefined,
+  to: string | undefined,
+  db: Db = getDb(),
+): Promise<{ breakdown: AccountBreakdown[]; accounts: { id: string; name: string; purpose: Purpose }[] }> {
+  const snapshots = await listSnapshots(null, db);
+  const today = new Date().toISOString().slice(0, 10);
+  const resolvedFrom = from || (snapshots.length ? [...snapshots].map((s) => s.asOf).sort()[0] : today);
+  const resolvedTo = to || today;
+
+  const accounts = db.select().from(schema.accounts).all()
+    .filter((a) => a.accountClass === 'investment')
+    .map((a) => ({ id: a.id, name: `${a.institution} · ${a.name}`, purpose: (a.purpose ?? 'portfolio') as Purpose }));
+
+  const overrides: PurposeOverride[] = db.select().from(schema.securityPurposes).all()
+    .map((o) => ({ accountId: o.accountId, securityId: o.securityId, purpose: o.purpose as Purpose }));
+
+  const flows: FlowRow[] = db.select().from(schema.cashFlows).all()
+    .filter((f) => f.confirmed && f.supersededBy == null)
+    .map((f) => ({ id: f.id, accountId: f.accountId, date: f.date, amount: f.amount, kind: f.kind, securityId: f.securityId ?? null }));
+
+  const securities = new Map<string, SecurityMeta>(
+    db.select().from(schema.securities).all().map((s) => [s.id, {
+      ticker: s.ticker, name: s.name, assetType: s.assetType, region: s.region, cap: s.cap, style: s.style, sector: s.sector, kind: s.kind,
+    }]),
+  );
+
+  const transactions: RawTxn[] = db.select().from(schema.investmentTransactions).all()
+    .map((t) => ({ id: t.id, accountId: t.accountId, date: t.date, type: t.type, subtype: t.subtype, securityId: t.securityId ?? null, amount: t.amount }));
+
+  const breakdown = assembleBreakdown({
+    from: resolvedFrom, to: resolvedTo, scope, accounts, overrides, snapshots, flows, securities, transactions,
+  });
+  return { breakdown, accounts };
 }

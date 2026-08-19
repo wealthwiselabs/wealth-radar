@@ -4,6 +4,7 @@ import {
   loadAllocationContext,
   loadPortfolioContext,
   listReserveFlows,
+  loadAccountBreakdown,
 } from '@/lib/investments/read';
 import { householdValueAt, allocationValueAt } from '@/lib/investments/allocation';
 import { purposeReturnBetween } from '@/lib/investments/series';
@@ -260,6 +261,53 @@ export const queryReserveTool: Tool = {
   },
 };
 
+function fmtReturn(r: { kind: 'ok'; value: number } | { kind: 'missing'; reason: string }): string {
+  return r.kind === 'ok' ? `${(r.value * 100).toFixed(2)}%` : `n/a (${r.reason})`;
+}
+
+export const getHoldingsBreakdownTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'get_holdings_breakdown',
+    description:
+      'Show the per-account investment breakdown that appears in the Holdings table: each ' +
+      "account's start/end value and return, its holdings (ticker, value, % of account, return), " +
+      'and recent transactions. Optionally filter by account (id or "all") and date range (from/to, YYYY-MM-DD).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        account: { type: 'string', description: 'Account id, or "all" (default)' },
+        from: { type: 'string', description: 'Inclusive start date YYYY-MM-DD' },
+        to: { type: 'string', description: 'Inclusive end date YYYY-MM-DD' },
+      },
+      additionalProperties: false,
+    },
+  },
+  async run(input: { account?: string; from?: string; to?: string }, { db }) {
+    const scope = input.account && input.account.trim() ? input.account.trim() : 'all';
+    const { breakdown } = await loadAccountBreakdown(scope, input.from, input.to, db);
+    if (breakdown.length === 0) return { content: NO_INVESTMENT_DATA };
+
+    const lines: string[] = [];
+    for (const acct of breakdown) {
+      const end = acct.endValue === null ? 'unknown' : money(acct.endValue);
+      lines.push(`${acct.accountName} [${acct.accountPurpose}] — value ${end} as of ${acct.endAsOf ?? 'n/a'}, return ${fmtReturn(acct.roi)}`);
+      for (const h of acct.holdings.slice(0, 15)) {
+        const tick = h.ticker ?? h.name;
+        lines.push(`  ${tick}: ${money(h.value)} (${(h.pct * 100).toFixed(1)}%) return ${fmtReturn(h.roi)}`);
+      }
+      if (acct.transactions.length) {
+        lines.push('  Recent transactions:');
+        for (const t of acct.transactions.slice(0, 15)) {
+          const tick = t.ticker ? ` ${t.ticker}` : '';
+          lines.push(`    ${t.date} ${t.type}${tick} ${money(t.amount)}`);
+        }
+      }
+    }
+    return { content: lines.join('\n') };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -267,4 +315,5 @@ export const readTools: Tool[] = [
   listInvestmentTransactionsTool,
   queryInvestmentReturnsTool,
   queryReserveTool,
+  getHoldingsBreakdownTool,
 ];
