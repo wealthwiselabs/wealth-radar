@@ -244,11 +244,30 @@ function accumulate(ctx: AllocContext, period: AllocationPeriod, targets: readon
   // confirmed flow but no in-period snapshots would double-count against the account
   // whose snapshots define the period. A flow WITH a securityId maps to that
   // security's path; an account-level flow (no securityId — e.g. a statement
-  // contribution) is distributed pro-rata across the account's close holdings, so
-  // the per-class contributions reconcile with the root total instead of stranding
+  // contribution) is distributed pro-rata across the account's holdings, so the
+  // per-class contributions reconcile with the root total instead of stranding
   // the whole amount at the root.
   const closeByAccount = new Map<string, SnapshotWithHoldings>();
-  for (const { close } of buckets) closeByAccount.set(close.accountId, close);
+  const openByAccount = new Map<string, SnapshotWithHoldings>();
+  for (const { open, close } of buckets) {
+    closeByAccount.set(close.accountId, close);
+    openByAccount.set(open.accountId, open);
+  }
+  // The holdings an account-level flow is pro-rated across. New money follows the
+  // CLOSE allocation (what you hold now), but a full liquidation leaves close
+  // holdings empty — a rolled-out balance would then strand at the root, and the
+  // vanished start value would read as a ~−100% loss for every class that was
+  // sold (the reported Bond/Tech bug). When close is empty, fall back to the OPEN
+  // allocation, so the outflow is charged to the classes it actually left.
+  const prorataBasis = (acctId: string): { holdings: ReturnType<typeof holdingsOf>; total: number } => {
+    const close = closeByAccount.get(acctId);
+    const closeHoldings = close ? holdingsOf(close) : [];
+    const closeTotal = closeHoldings.reduce((s, h) => s + h.value, 0);
+    if (closeTotal > 0) return { holdings: closeHoldings, total: closeTotal };
+    const open = openByAccount.get(acctId);
+    const openHoldings = open ? holdingsOf(open) : [];
+    return { holdings: openHoldings, total: openHoldings.reduce((s, h) => s + h.value, 0) };
+  };
   for (const f of ctx.flows) {
     if (!bucketAccountIds.has(f.accountId)) continue;
     if (f.date < bucketT0 || f.date > bucketT1) continue;
@@ -258,12 +277,10 @@ function accumulate(ctx: AllocContext, period: AllocationPeriod, targets: readon
       add(contrib, bucketPath(ctx.tagsBySecurity.get(f.securityId) ?? UNTAGGED), f.amount);
       continue;
     }
-    const close = closeByAccount.get(f.accountId);
-    const closeHoldings = close ? holdingsOf(close) : [];
-    const closeTotal = closeHoldings.reduce((s, h) => s + h.value, 0);
-    if (close && closeTotal > 0) {
-      for (const h of closeHoldings) {
-        add(contrib, bucketPath(ctx.tagsBySecurity.get(h.securityId) ?? UNTAGGED), f.amount * (h.value / closeTotal));
+    const { holdings, total } = prorataBasis(f.accountId);
+    if (total > 0) {
+      for (const h of holdings) {
+        add(contrib, bucketPath(ctx.tagsBySecurity.get(h.securityId) ?? UNTAGGED), f.amount * (h.value / total));
       }
     }
   }
@@ -287,18 +304,16 @@ function accumulate(ctx: AllocContext, period: AllocationPeriod, targets: readon
       for (const ef of classExchangeFlows(ctx, acctId, bucketT0, bucketT1, targets)) pushRoi(ef.pathKey, { date: ef.date, amount: ef.amount }, true);
       continue;
     }
-    const close = closeByAccount.get(acctId);
-    const closeHoldings = close ? holdingsOf(close) : [];
-    const closeTotal = closeHoldings.reduce((s, h) => s + h.value, 0);
+    const { holdings, total } = prorataBasis(acctId);
     for (const f of ctx.flows) {
       if (f.accountId !== acctId || f.date < bucketT0 || f.date > bucketT1) continue;
       if (f.securityId) {
         const p = securityPurpose(ctx, f.accountId, f.securityId);
         if (!targets.includes(p)) continue;
         addPrefixes(bucketPath(ctx.tagsBySecurity.get(f.securityId) ?? UNTAGGED), { date: f.date, amount: f.amount }, false);
-      } else if (close && closeTotal > 0) {
-        for (const h of closeHoldings) {
-          addPrefixes(bucketPath(ctx.tagsBySecurity.get(h.securityId) ?? UNTAGGED), { date: f.date, amount: f.amount * (h.value / closeTotal) }, false);
+      } else if (total > 0) {
+        for (const h of holdings) {
+          addPrefixes(bucketPath(ctx.tagsBySecurity.get(h.securityId) ?? UNTAGGED), { date: f.date, amount: f.amount * (h.value / total) }, false);
         }
       }
     }
