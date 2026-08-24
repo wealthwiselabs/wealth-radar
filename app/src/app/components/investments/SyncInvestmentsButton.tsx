@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { notifyDataChanged } from '@/lib/dataEvents';
 
 export default function SyncInvestmentsButton({ onSynced }: { onSynced: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -19,7 +20,12 @@ export default function SyncInvestmentsButton({ onSynced }: { onSynced: () => vo
       const r = await fetch('/api/investments/sync', { method: 'POST' });
       const d = await r.json();
       setMsg(r.ok ? `Synced ${d.snapshots ?? 0} snapshot(s) across ${d.items ?? 0} connection(s)` : (d.error ?? 'Sync failed'));
-      if (r.ok) onSynced();
+      if (r.ok) {
+        onSynced();
+        // Announce app-wide so any other open view (gaps badge, an investments
+        // tab that doesn't own this button) refreshes off the same event.
+        notifyDataChanged();
+      }
     } catch {
       setMsg('Sync failed');
     } finally { setBusy(false); }

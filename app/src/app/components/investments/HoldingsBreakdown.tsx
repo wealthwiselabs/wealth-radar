@@ -220,7 +220,7 @@ function AccountPanel({ b, onSaved }: { b: AccountBreakdown; onSaved: () => void
   );
 }
 
-export default function HoldingsBreakdown({ from, to }: { from: string; to: string }) {
+export default function HoldingsBreakdown({ from, to, refreshKey = 0 }: { from: string; to: string; refreshKey?: number }) {
   const [accounts, setAccounts] = useState<{ id: string; name: string }[]>([]);
   const [account, setAccount] = useState('');           // one account at a time
   const [entry, setEntry] = useState<AccountBreakdown | null>(null);
@@ -230,7 +230,7 @@ export default function HoldingsBreakdown({ from, to }: { from: string; to: stri
   // Populate the account list once, and default to the first account.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/investments/breakdown?account=all&from=${from}&to=${to}`)
+    fetch(`/api/investments/breakdown?account=all&from=${from}&to=${to}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('accounts'))))
       .then((j: BreakdownResponse) => {
         if (cancelled) return;
@@ -241,13 +241,13 @@ export default function HoldingsBreakdown({ from, to }: { from: string; to: stri
       })
       .catch(() => { if (!cancelled) setError('Failed to load accounts.'); });
     return () => { cancelled = true; };
-  }, [from, to]);
+  }, [from, to, refreshKey]);
 
   const load = useCallback(async () => {
     if (!account) return;
     setIsLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/investments/breakdown?account=${encodeURIComponent(account)}&from=${from}&to=${to}`);
+      const res = await fetch(`/api/investments/breakdown?account=${encodeURIComponent(account)}&from=${from}&to=${to}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('load');
       const j: BreakdownResponse = await res.json();
       setEntry(j.breakdown[0] ?? null);
@@ -256,7 +256,7 @@ export default function HoldingsBreakdown({ from, to }: { from: string; to: stri
     } finally {
       setIsLoading(false);
     }
-  }, [account, from, to]);
+  }, [account, from, to, refreshKey]);
 
   useEffect(() => { void load(); }, [load]);
 

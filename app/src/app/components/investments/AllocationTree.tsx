@@ -156,7 +156,7 @@ function Row({
   );
 }
 
-export default function AllocationTree({ from, to }: { from: string; to: string }) {
+export default function AllocationTree({ from, to, refreshKey = 0 }: { from: string; to: string; refreshKey?: number }) {
   const [data, setData] = useState<AllocationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +166,7 @@ export default function AllocationTree({ from, to }: { from: string; to: string 
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    fetch(`/api/investments/allocation/range?from=${from}&to=${to}`)
+    fetch(`/api/investments/allocation/range?from=${from}&to=${to}`, { cache: 'no-store' })
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load allocation');
         return res.json();
@@ -193,7 +193,7 @@ export default function AllocationTree({ from, to }: { from: string; to: string 
     return () => {
       cancelled = true;
     };
-  }, [from, to]);
+  }, [from, to, refreshKey]);
 
   const toggle = (key: string) => {
     setExpanded((prev) => {

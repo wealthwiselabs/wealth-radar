@@ -1,15 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PurposeTiles from '@/app/components/investments/PurposeTiles';
 import PortfolioTrendChart, { type TrendMetric } from '@/app/components/investments/PortfolioTrendChart';
 import AllocationTree from '@/app/components/investments/AllocationTree';
 import HoldingsBreakdown from '@/app/components/investments/HoldingsBreakdown';
-import ReturnsGrid from '@/app/components/investments/ReturnsGrid';
+import EducationTrend from '@/app/components/investments/EducationTrend';
 import SyncInvestmentsButton from '@/app/components/investments/SyncInvestmentsButton';
 import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
+import { onDataChanged } from '@/lib/dataEvents';
 import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
 import { PRESET_LABELS } from '@/lib/timeRange';
 import type { AllocationBasis } from '@/lib/investments/periods';
@@ -29,7 +30,9 @@ interface Period {
 async function getJson<T>(url: string): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(url);
+    // no-store: after a sync we refetch to show just-written data, so a cached
+    // body (from any proxy/CDN in front of the app) would defeat the refresh.
+    res = await fetch(url, { cache: 'no-store' });
   } catch {
     throw new Error(`Could not reach ${url}. Is the server running?`);
   }
@@ -58,8 +61,22 @@ export default function InvestmentsPage() {
   const [metric, setMetric] = useState<TrendMetric>('value');
   const { preset, customRange, dateRange, handleChange } = useTimeRange();
 
+  // Bumped on every refresh and threaded into each self-fetching section
+  // (asset snapshot, trend, holdings, education) so a sync re-fetches them
+  // deterministically — rather than relying on the whole page flashing to
+  // "Loading…" and remounting them as a side effect.
+  const [refreshKey, setRefreshKey] = useState(0);
+  // The first load blanks the page to a spinner; later refreshes must not, or a
+  // sync/refocus would wipe the asset snapshot to "Loading…" every time. Each
+  // section shows its own inline loading state while it refetches in place.
+  const didInitialLoad = useRef(false);
+  // A sync fires both onSynced AND notifyDataChanged; coalesce refreshes landing
+  // within one tick so that's a single reload, not two racing ones.
+  const lastRefreshAt = useRef(0);
+
   const load = useCallback(async () => {
-    setLoading(true);
+    const initial = !didInitialLoad.current;
+    if (initial) setLoading(true);
     setError(null);
     try {
       const r = await getJson<{ series?: Record<string, SeriesEntry> }>('/api/investments/returns');
@@ -70,12 +87,27 @@ export default function InvestmentsPage() {
       setSeries({});
       setError(e instanceof Error ? e.message : 'Could not load investment data.');
     } finally {
-      setLoading(false);
+      didInitialLoad.current = true;
+      if (initial) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
-  useRefreshOnFocus(load);
+  // One refresh entry point: refetch the headline series AND bump refreshKey so
+  // every self-fetching section reloads in lockstep. Used for the initial load,
+  // a manual sync, tab-refocus, and any in-app data-change event.
+  const refreshAll = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefreshAt.current < 300) return;   // coalesce onSynced + notifyDataChanged
+    lastRefreshAt.current = now;
+    setRefreshKey((k) => k + 1);
+    void load();
+  }, [load]);
+
+  useEffect(() => { refreshAll(); }, [refreshAll]);
+  useRefreshOnFocus(refreshAll);
+  // A sync/import/edit anywhere in the app (it calls notifyDataChanged) refreshes
+  // this page live, without waiting for a tab-refocus.
+  useEffect(() => onDataChanged(refreshAll), [refreshAll]);
 
   /** The newest reading, or null when there is no trustworthy one. */
   const latest = (purpose: string): number | null => {
@@ -115,7 +147,7 @@ export default function InvestmentsPage() {
     <main className="min-h-screen p-[var(--space-6)] max-w-6xl mx-auto">
       <div className="mb-[var(--space-6)] flex flex-wrap items-center justify-between gap-[var(--space-3)]">
         <h1 className="heading-large text-[var(--color-text-base-default)]">Investments</h1>
-        <SyncInvestmentsButton onSynced={load} />
+        <SyncInvestmentsButton onSynced={refreshAll} />
       </div>
 
       {loading ? (
@@ -170,7 +202,7 @@ export default function InvestmentsPage() {
             </select>
           </div>
 
-          <PortfolioTrendChart basis={basis} metric={metric} from={dateRange.startDate} to={dateRange.endDate} />
+          <PortfolioTrendChart basis={basis} metric={metric} from={dateRange.startDate} to={dateRange.endDate} refreshKey={refreshKey} />
 
           <div>
             <div className="flex items-center justify-between mb-[var(--space-3)] flex-wrap gap-[var(--space-3)]">
@@ -178,18 +210,12 @@ export default function InvestmentsPage() {
                 Asset snapshot — {PRESET_LABELS[preset]}
               </h2>
             </div>
-            <AllocationTree from={dateRange.startDate} to={dateRange.endDate} />
+            <AllocationTree from={dateRange.startDate} to={dateRange.endDate} refreshKey={refreshKey} />
           </div>
 
-          <HoldingsBreakdown from={dateRange.startDate} to={dateRange.endDate} />
+          <HoldingsBreakdown from={dateRange.startDate} to={dateRange.endDate} refreshKey={refreshKey} />
 
-          <ReturnsGrid
-            purpose="education"
-            title="Education (529)"
-            basis={basis === 'monthly' ? 'monthly' : 'quarterly'}
-            from={dateRange.startDate}
-            to={dateRange.endDate}
-          />
+          <EducationTrend from={dateRange.startDate} to={dateRange.endDate} refreshKey={refreshKey} />
         </div>
       )}
     </main>
