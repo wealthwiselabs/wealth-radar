@@ -59,6 +59,7 @@ async function fetchSeries(
 ): Promise<Series> {
   const res = await fetch(
     `/api/investments/allocation/trend?basis=${basis}&path=${path.join('/')}&from=${from}&to=${to}`,
+    { cache: 'no-store' },
   );
   if (!res.ok) throw new Error('Failed to load trend');
   const json: { points?: Series['points'] } = await res.json();
@@ -70,11 +71,13 @@ export default function PortfolioTrendChart({
   metric,
   from,
   to,
+  refreshKey = 0,
 }: {
   basis: AllocationBasis;
   metric: TrendMetric;
   from: string;
   to: string;
+  refreshKey?: number;
 }) {
   const [tree, setTree] = useState<AllocNode | null>(null);
   const [overlays, setOverlays] = useState<Overlay[]>([]);
@@ -98,7 +101,7 @@ export default function PortfolioTrendChart({
   // happens at most once, the first time a non-null tree arrives.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/investments/allocation?basis=${basis}&period=`)
+    fetch(`/api/investments/allocation?basis=${basis}&period=`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('tree'))))
       .then((json: { tree: AllocNode | null }) => {
         if (cancelled) return;
@@ -119,7 +122,7 @@ export default function PortfolioTrendChart({
     return () => {
       cancelled = true;
     };
-  }, [basis]);
+  }, [basis, refreshKey]);
 
   // The set of lines to plot: pinned Total (path []) + overlays. Fetch each and
   // merge onto the Total axis. Re-runs on basis or overlay changes.
@@ -147,7 +150,7 @@ export default function PortfolioTrendChart({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, basis, overlayKey, from, to]);
+  }, [ready, basis, overlayKey, from, to, refreshKey]);
 
   const handleLevelChange = (level: number, value: string) => {
     setSelections((prev) => {

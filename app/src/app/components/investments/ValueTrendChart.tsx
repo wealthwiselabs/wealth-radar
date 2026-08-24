@@ -20,11 +20,14 @@ interface Props {
   color: string;
   /** Rendered under the title — e.g. the window's overall ROI. */
   subtitle?: string;
+  /** Optional block rendered between the subtitle and the chart — e.g. a
+   *  Start / End / Δ / ROI summary row sitting at the top of the chart. */
+  header?: React.ReactNode;
   /** Rendered under the chart. */
   caption?: string;
 }
 
-export default function ValueTrendChart({ title, points, color, subtitle, caption }: Props) {
+export default function ValueTrendChart({ title, points, color, subtitle, header, caption }: Props) {
   const data = useMemo(() => ({
     labels: points.map((p) => p.label),
     datasets: [{
@@ -86,6 +89,7 @@ export default function ValueTrendChart({ title, points, color, subtitle, captio
       {subtitle && (
         <p className="mt-[var(--space-1)] mb-[var(--space-4)] text-small text-[var(--color-text-base-subdued)]">{subtitle}</p>
       )}
+      {header}
       <div className="h-64">
         <Line data={data} options={options} />
       </div>
