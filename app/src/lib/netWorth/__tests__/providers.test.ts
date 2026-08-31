@@ -38,4 +38,16 @@ describe('rentcast provider', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 429 })));
     await expect(makeRentcastProvider('k').estimate('x')).rejects.toThrow(/429/);
   });
+
+  it('throws when the response is valid JSON but carries no usable price', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ priceRangeLow: 1_000, priceRangeHigh: 2_000 }), { status: 200 })));
+    await expect(makeRentcastProvider('k').estimate('x')).rejects.toThrow(/no usable price/i);
+  });
+
+  it('throws rather than returning NaN when price is not a number', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ price: 'unavailable' }), { status: 200 })));
+    await expect(makeRentcastProvider('k').estimate('x')).rejects.toThrow(/no usable price/i);
+  });
 });
