@@ -170,7 +170,12 @@ export async function resolveOrCreateAccount(input: ResolveAccountInput, db: Db 
     plaidAccountId: input.plaidAccountId ?? null,
     closedAtMonth: null,
     status: 'active',
-    reviewIntervalMonths: null,
+    // A Plaid-fed account is synced automatically, so a stale reading is
+    // impossible by construction — it must never surface in staleAccounts's
+    // "needs a look" list. A manual/PDF account has no cadence assigned at
+    // creation either, so both origins land on null here today; only the
+    // Plaid case is a hard invariant.
+    reviewIntervalMonths: input.origin === 'plaid' ? null : null,
     securedByAccountId: null,
     valuationProvider: null,
     valuationRef: null,

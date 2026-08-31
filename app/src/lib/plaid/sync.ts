@@ -12,6 +12,7 @@ import { monthOf, recomputeMonthlyAggregates } from '@/lib/aggregates';
 import { getPlaidClient } from '@/lib/plaid/client';
 import { snapshotDb } from '@/lib/backup';
 import { syncInvestments as defaultSyncInvestments } from '@/lib/plaid/syncInvestments';
+import { upsertBalanceSnapshot } from '@/lib/netWorth/write';
 
 type Db = ReturnType<typeof getDb>;
 type ItemRow = typeof schema.plaidItems.$inferSelect;
@@ -53,7 +54,30 @@ export async function syncItem(item: ItemRow, deps: SyncDeps, db: Db = getDb()) 
     const acctResp = await deps.client.accountsGet({ access_token: accessToken });
     for (const a of acctResp.data.accounts) {
       if (suppressed.has(a.account_id)) continue;
-      await resolveOrCreateAccount({ ...mapPlaidAccount(a, item.institutionName ?? 'Bank', item.owner), plaidItemId: item.id }, db);
+      const account = await resolveOrCreateAccount(
+        { ...mapPlaidAccount(a, item.institutionName ?? 'Bank', item.owner), plaidItemId: item.id }, db);
+
+      // Balance capture. accountsGet is already being called for provisioning —
+      // this consumes a payload that was previously discarded, so there is no
+      // extra request and no extra Plaid scope.
+      //
+      // Investment accounts are skipped: syncInvestments values those from
+      // holdings, and investment_snapshots is the authoritative table for them.
+      if (a.type !== 'investment' && a.type !== 'brokerage') {
+        const raw = a.balances?.current ?? a.balances?.available ?? null;
+        // A missing balance is not a zero balance. Some institutions report
+        // neither figure, and writing 0 would silently wipe the account's value.
+        if (raw !== null && raw !== undefined) {
+          await upsertBalanceSnapshot({
+            accountId: account.id,
+            asOf: new Date().toISOString().slice(0, 10),
+            // Plaid reports credit and loan balances as positive amounts owed;
+            // we store magnitudes and derive sign from netWorthSide.
+            balance: Math.abs(raw),
+            source: 'plaid',
+          }, db);
+        }
+      }
     }
 
     let cursor = item.cursor ?? undefined;
