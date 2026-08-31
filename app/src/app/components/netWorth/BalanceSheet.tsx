@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { formatCurrency, formatSignedCurrency } from '@/lib/chartConfig';
 import { notifyDataChanged } from '@/lib/dataEvents';
 import { monthsBetween } from '@/lib/netWorth/staleness';
+import AddItemSheet from '@/app/components/netWorth/AddItemSheet';
 import type { RegisterRow } from '@/app/net-worth/page';
 
 function ageLabel(lastAsOf: string | null, interval: number | null): { text: string; stale: boolean } {
@@ -70,6 +71,31 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
     }
   }
 
+  async function remove() {
+    // Two verbs, deliberately. Deleting an item that has recorded values would
+    // rewrite past periods on the trend chart — "I sold my car" must not erase a
+    // year of history. Once anything is recorded, the only removal is a close.
+    const closing = !row.canDelete;
+    const message = closing
+      ? `Close ${row.name}? It stops counting from this month, and past months keep its value.`
+      : `Delete ${row.name}? It has no recorded values, so nothing is lost.`;
+    if (!window.confirm(message)) return;
+    const res = closing
+      ? await fetch(`/api/net-worth/accounts/${row.accountId}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ closedAtMonth: new Date().toISOString().slice(0, 7) }),
+        })
+      : await fetch(`/api/net-worth/accounts/${row.accountId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(typeof body.error === 'string' ? body.error : 'Could not remove the item.');
+      return;
+    }
+    notifyDataChanged();
+    onChanged();
+  }
+
   return (
     <div className="flex items-baseline justify-between gap-[var(--space-3)] py-[var(--space-2)]">
       <div>
@@ -99,6 +125,14 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
           onKeyDown={(e) => { if (e.key === 'Enter') void commit(); }}
           onBlur={() => { if (draft.trim() !== '') void commit(); }}
         />
+        <button
+          type="button"
+          className="origin-btn origin-btn-secondary"
+          aria-label={`Remove ${row.name}`}
+          onClick={() => { void remove(); }}
+        >
+          {row.canDelete ? 'Delete' : 'Close'}
+        </button>
       </div>
     </div>
   );
@@ -132,13 +166,21 @@ function SecuredUnder({ asset, allRows }: { asset: RegisterRow; allRows: Registe
   );
 }
 
-function Column({ title, rows, allRows, testId, onChanged }: {
-  title: string; rows: RegisterRow[]; allRows: RegisterRow[]; testId: string; onChanged: () => void;
+function Column({ title, side, rows, allRows, testId, onChanged }: {
+  title: string; side: 'asset' | 'liability'; rows: RegisterRow[]; allRows: RegisterRow[];
+  testId: string; onChanged: () => void;
 }) {
   const total = rows.reduce((sum, r) => sum + (r.value ?? 0), 0);
   return (
     <div className="origin-card p-[var(--space-4)]">
-      <h3 className="text-small text-[var(--color-text-base-subdued)] mb-[var(--space-2)]">{title}</h3>
+      <div className="flex items-center justify-between mb-[var(--space-2)]">
+        <h3 className="text-small text-[var(--color-text-base-subdued)]">{title}</h3>
+        <AddItemSheet
+          side={side}
+          existingAssets={allRows.filter((r) => r.side === 'asset')}
+          onCreated={onChanged}
+        />
+      </div>
       {rows.length === 0
         ? <p className="text-xsmall text-[var(--color-text-base-subdued)]">Nothing here yet.</p>
         : rows.map((r) => (
@@ -160,9 +202,9 @@ function Column({ title, rows, allRows, testId, onChanged }: {
 export default function BalanceSheet({ rows, onChanged }: { rows: RegisterRow[]; onChanged: () => void }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--space-4)]">
-      <Column title="Assets" testId="assets-total" onChanged={onChanged} allRows={rows}
+      <Column title="Assets" side="asset" testId="assets-total" onChanged={onChanged} allRows={rows}
         rows={rows.filter((r) => r.side === 'asset')} />
-      <Column title="Liabilities" testId="liabilities-total" onChanged={onChanged} allRows={rows}
+      <Column title="Liabilities" side="liability" testId="liabilities-total" onChanged={onChanged} allRows={rows}
         rows={rows.filter((r) => r.side === 'liability')} />
     </div>
   );
