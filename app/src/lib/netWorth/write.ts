@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { accounts, balanceSnapshots, investmentSnapshots } from '@/db/schema';
 import { catalogByKey } from '@/lib/netWorth/catalog';
@@ -10,6 +10,13 @@ export class AccountHasHistoryError extends Error {
   constructor(public accountId: string) {
     super('This item has recorded values. Close it instead of deleting it, so past periods stay correct.');
     this.name = 'AccountHasHistoryError';
+  }
+}
+
+export class DuplicateItemNameError extends Error {
+  constructor(public itemName: string) {
+    super(`You already have an item called "${itemName}". Give this one a different name.`);
+    this.name = 'DuplicateItemNameError';
   }
 }
 
@@ -68,6 +75,18 @@ export interface CreateInput {
 export async function createNetWorthAccount(input: CreateInput, db: Db = getDb()): Promise<string> {
   const item = catalogByKey(input.catalogKey);
   if (!item) throw new Error(`Unknown catalog key: ${input.catalogKey}`);
+
+  // Every manual net-worth item is created with the same (owner, institution,
+  // mask) = ('', 'Manual', null), so the real uniqueness constraint on
+  // (owner, institution, name, coalesce(mask,'')) collapses to "name must be
+  // unique among these items." AddItemSheet pre-fills the name with the catalog
+  // label, and a household can easily own two of the same thing (two cars, two
+  // credit cards) — checking here turns that first-run collision into a message
+  // the user can act on, rather than a raw driver error surfacing as a 500.
+  const dup = db.select().from(accounts)
+    .where(and(eq(accounts.owner, ''), eq(accounts.institution, 'Manual'), eq(accounts.name, input.name), isNull(accounts.mask)))
+    .get();
+  if (dup) throw new DuplicateItemNameError(input.name);
 
   const now = new Date().toISOString();
   const id = randomUUID();

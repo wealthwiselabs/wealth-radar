@@ -5,7 +5,7 @@ import { makeTmpDb } from '@/test/tmpDb';
 import { accounts, balanceSnapshots, investmentSnapshots } from '@/db/schema';
 import {
   upsertBalanceSnapshot, createNetWorthAccount, closeNetWorthAccount,
-  deleteNetWorthAccount, AccountHasHistoryError,
+  deleteNetWorthAccount, AccountHasHistoryError, DuplicateItemNameError,
 } from '@/lib/netWorth/write';
 
 describe('createNetWorthAccount', () => {
@@ -41,6 +41,18 @@ describe('createNetWorthAccount', () => {
   it('rejects an unknown catalog key', async () => {
     const { db } = makeTmpDb();
     await expect(createNetWorthAccount({ catalogKey: 'nope', name: 'X' }, db)).rejects.toThrow(/unknown catalog/i);
+  });
+
+  // The household this was built for owns two cars. Adding a second "Car"
+  // without renaming it must fail with an actionable message, not a raw
+  // SQLite UNIQUE constraint error.
+  it('rejects a second item with the same name as a clear, actionable error', async () => {
+    const { db } = makeTmpDb();
+    await createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 30_000 }, db);
+    await expect(createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 18_000 }, db))
+      .rejects.toBeInstanceOf(DuplicateItemNameError);
+    await expect(createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 18_000 }, db))
+      .rejects.toThrow(/already have an item called "Car"/i);
   });
 });
 

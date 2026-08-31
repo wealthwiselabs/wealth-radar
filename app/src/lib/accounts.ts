@@ -175,7 +175,7 @@ export async function resolveOrCreateAccount(input: ResolveAccountInput, db: Db 
     // "needs a look" list. A manual/PDF account has no cadence assigned at
     // creation either, so both origins land on null here today; only the
     // Plaid case is a hard invariant.
-    reviewIntervalMonths: input.origin === 'plaid' ? null : null,
+    reviewIntervalMonths: null,
     securedByAccountId: null,
     valuationProvider: null,
     valuationRef: null,

@@ -12,7 +12,7 @@ vi.mock('@/db/client', async (orig) => {
 
 import { GET } from '../route';
 import { DELETE, PATCH } from '../accounts/[id]/route';
-import { createNetWorthAccount } from '@/lib/netWorth/write';
+import { createNetWorthAccount, closeNetWorthAccount } from '@/lib/netWorth/write';
 
 afterEach(() => { delete process.env.RENTCAST_API_KEY; });
 
@@ -47,6 +47,33 @@ describe('GET /api/net-worth', () => {
     process.env.RENTCAST_API_KEY = 'k';
     const body = await (await GET(req())).json();
     expect(body.providerConfigured).toBe(true);
+  });
+});
+
+describe('GET /api/net-worth — closed accounts: register agrees with the totals', () => {
+  it('still lists and still counts a row closed in the CURRENT month', async () => {
+    const before = await (await GET(req())).json();
+    const id = await createNetWorthAccount(
+      { catalogKey: 'car', name: 'This-month car', value: 30_000 }, db);
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    await closeNetWorthAccount(id, thisMonth, db);
+
+    const after = await (await GET(req())).json();
+    const row = after.rows.find((r: { name: string }) => r.name === 'This-month car');
+    expect(row).toBeDefined();
+    expect(after.totals.assets).toBe(before.totals.assets + 30_000);
+  });
+
+  it('lists and counts neither a row closed in a PRIOR month', async () => {
+    const before = await (await GET(req())).json();
+    const id = await createNetWorthAccount(
+      { catalogKey: 'car', name: 'Old car', value: 30_000 }, db);
+    await closeNetWorthAccount(id, '2020-01', db);
+
+    const after = await (await GET(req())).json();
+    const row = after.rows.find((r: { name: string }) => r.name === 'Old car');
+    expect(row).toBeUndefined();
+    expect(after.totals.assets).toBe(before.totals.assets);
   });
 });
 

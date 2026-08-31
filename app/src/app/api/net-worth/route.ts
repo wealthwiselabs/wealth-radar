@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/db/client';
 import { balanceSnapshots } from '@/db/schema';
 import { loadNetWorthContext } from '@/lib/netWorth/read';
-import { netWorthAt } from '@/lib/netWorth/rollup';
+import { isCountable, netWorthAt } from '@/lib/netWorth/rollup';
 import { valuationAt } from '@/lib/netWorth/valuation';
 import { netWorthSide } from '@/lib/netWorth/side';
 import { groupForSubtype } from '@/lib/netWorth/catalog';
@@ -24,8 +24,12 @@ export async function GET(_request: Request) {
       rangeByAccountAndAsOf.set(`${s.accountId}::${s.asOf}`, { low: s.valueLow, high: s.valueHigh });
     }
 
+    // A row is listed exactly when it is counted: a closed account still counts
+    // through the end of its closing month (isCountable, rollup.ts), so filtering
+    // on status alone here would drop the row from the register a month before
+    // the totals stop including it — two disagreeing numbers on one screen.
     const rows = ctx.accounts
-      .filter((a) => netWorthSide(a) !== 'excluded' && a.status !== 'closed')
+      .filter((a) => netWorthSide(a) !== 'excluded' && isCountable(a, today))
       .map((a) => {
         const readings = [...ctx.balances, ...ctx.investments]
           .filter((r) => r.accountId === a.id)

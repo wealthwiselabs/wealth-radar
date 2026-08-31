@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { makeTmpDb } from '@/test/tmpDb';
 import { balanceSnapshots } from '@/db/schema';
 
@@ -18,6 +19,7 @@ import { syncItem } from '@/lib/plaid/sync';
 import { loadNetWorthContext } from '@/lib/netWorth/read';
 import { staleAccounts } from '@/lib/netWorth/staleness';
 import { encryptToken } from '@/lib/crypto';
+import { getAccountByPlaidId } from '@/lib/accounts';
 
 const account = (over: Record<string, unknown>) => ({
   account_id: 'p1', name: 'Card', official_name: null, mask: '1234',
@@ -50,6 +52,25 @@ describe('sync writes balances', () => {
     // rather than cosmetic.
     expect(rows[0].balance).toBe(8400);
     expect(rows[0].source).toBe('plaid');
+  });
+
+  // Math.abs is correct for credit/loan, where Plaid reports a positive amount
+  // owed — but a depository account sits directly on the asset side, and its
+  // `current` balance is already signed. An overdrawn checking account (-200)
+  // is a real state: forcing it through Math.abs would turn a real liability
+  // into a phantom +200 asset. So only credit/loan get Math.abs; a depository
+  // balance is stored as-is, letting the negative value reduce assetsLiquid
+  // exactly the way an overdraft actually reduces net worth.
+  it('preserves a negative balance for an overdrawn depository account, rather than flipping it into an asset', async () => {
+    await syncItem(item, {
+      client: client([account({
+        account_id: 'p6', mask: '6600', type: 'depository', subtype: 'checking',
+        balances: { current: -200, available: -200 },
+      })]),
+    } as never);
+    const acct = (await getAccountByPlaidId('p6', db))!;
+    const row = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, acct.id)).get();
+    expect(row?.balance).toBe(-200);
   });
 
   it('falls back to available when current is null', async () => {

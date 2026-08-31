@@ -26,7 +26,7 @@ export interface SeriesPoint extends NetWorthTotals {
  * forever — but zeroing it retroactively would rewrite the trend, which is why
  * closing is a status change rather than a delete.
  */
-function isCountable(a: AccountRow, date: string): boolean {
+export function isCountable(a: AccountRow, date: string): boolean {
   if (a.status !== 'closed') return true;
   if (!a.closedAtMonth) return false;
   return date.slice(0, 7) <= a.closedAtMonth;

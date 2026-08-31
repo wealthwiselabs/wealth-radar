@@ -68,12 +68,21 @@ export async function syncItem(item: ItemRow, deps: SyncDeps, db: Db = getDb()) 
         // A missing balance is not a zero balance. Some institutions report
         // neither figure, and writing 0 would silently wipe the account's value.
         if (raw !== null && raw !== undefined) {
+          // Plaid reports credit and loan balances as positive amounts owed;
+          // we store magnitudes there and derive sign from netWorthSide. A
+          // depository account is different: it sits directly on the asset
+          // side, and Plaid's `current` figure for it is already signed. An
+          // overdrawn checking account (-200) is a real liability state —
+          // forcing it through Math.abs would turn it into a phantom +200
+          // asset. So Math.abs applies only to credit/loan; everything else
+          // (depository, and any other type) is stored as Plaid reports it,
+          // letting a negative balance reduce assetsLiquid the way an
+          // overdraft actually reduces net worth.
+          const balance = a.type === 'credit' || a.type === 'loan' ? Math.abs(raw) : raw;
           await upsertBalanceSnapshot({
             accountId: account.id,
             asOf: new Date().toISOString().slice(0, 10),
-            // Plaid reports credit and loan balances as positive amounts owed;
-            // we store magnitudes and derive sign from netWorthSide.
-            balance: Math.abs(raw),
+            balance,
             source: 'plaid',
           }, db);
         }
