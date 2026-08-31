@@ -170,9 +170,13 @@ function Row({ row, onChanged, providerConfigured }: {
         {error && <p className="text-xsmall text-[var(--color-text-critical)]">{error}</p>}
       </div>
       <div className="flex items-center gap-[var(--space-2)]">
-        {/* An unvalued item is an em dash, never $0. The difference is the point. */}
+        {/* An unvalued item is an em dash, never $0. The difference is the point.
+            Signed, not formatCurrency: depository balances are stored signed
+            (sync.ts), so an overdrawn checking account is a real negative that
+            must show as such, not get silently flipped positive. Liability rows
+            are magnitudes by construction, so this is a no-op for them. */}
         <span className="text-small text-[var(--color-text-base-default)] tabular-nums">
-          {row.value === null ? '—' : formatCurrency(row.value)}
+          {row.value === null ? '—' : formatSignedCurrency(row.value)}
         </span>
         {providerConfigured && row.source === 'estimate' && row.valueLow !== null && row.valueHigh !== null && (
           /* An AVM is a range, not a measurement. Showing only the midpoint beside a
@@ -317,8 +321,13 @@ function Column({ title, side, rows, allRows, testId, onChanged, providerConfigu
           ))}
       <div className="flex justify-between border-t border-[var(--color-border-base-subdued)] mt-[var(--space-2)] pt-[var(--space-2)]">
         <span className="text-small text-[var(--color-text-base-subdued)]">Total</span>
+        {/* Signed for the same reason as the row above: the liability column can
+            never go negative (its rows are magnitudes by construction), so this
+            is unobservable there, but the assets column legitimately can — an
+            overdrawn depository account large enough to exceed the rest of the
+            column would otherwise report a positive total for a negative sum. */}
         <span data-testid={testId} className="text-small text-[var(--color-text-base-default)] tabular-nums">
-          {formatCurrency(total)}
+          {formatSignedCurrency(total)}
         </span>
       </div>
     </div>

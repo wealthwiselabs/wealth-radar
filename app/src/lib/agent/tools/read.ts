@@ -17,7 +17,7 @@ import {
 import { purposeReturnBetween } from '@/lib/investments/series';
 import type { Purpose } from '@/lib/investments/purpose';
 import { loadNetWorthContext } from '@/lib/netWorth/read';
-import { netWorthAt } from '@/lib/netWorth/rollup';
+import { isCountable, netWorthAt } from '@/lib/netWorth/rollup';
 import { staleAccounts } from '@/lib/netWorth/staleness';
 import { netWorthSide } from '@/lib/netWorth/side';
 import { valuationAt } from '@/lib/netWorth/valuation';
@@ -461,8 +461,13 @@ export async function readNetWorth(db?: Parameters<typeof loadNetWorthContext>[0
     assets: totals.assets,
     liabilities: totals.liabilities,
     missing: totals.missing,
+    // A row is listed exactly when it is counted: a closed account still counts
+    // through the end of its closing month (isCountable, rollup.ts) — the same
+    // rule the API route (route.ts) uses for the register. Filtering on status
+    // alone would make the assistant disagree with the page for up to a month
+    // after an item closes.
     rows: ctx.accounts
-      .filter((a) => netWorthSide(a) !== 'excluded' && a.status !== 'closed')
+      .filter((a) => netWorthSide(a) !== 'excluded' && isCountable(a, today))
       .map((a) => ({ name: a.name, side: netWorthSide(a), value: valuationAt(ctx, a.id, today) })),
     stale: staleAccounts(ctx, today).map((s) => ({ name: s.name, lastAsOf: s.lastAsOf })),
   };

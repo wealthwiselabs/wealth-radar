@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Chart } from 'react-chartjs-2';
 import type { ChartOptions, ChartData } from 'chart.js';
 import '@/lib/chartConfig';
-import { CHART_PALETTE, CHART_DANGER, CHART_INK, formatCurrency } from '@/lib/chartConfig';
+import { CHART_PALETTE, CHART_DANGER, CHART_INK, formatCurrency, formatSignedCurrency } from '@/lib/chartConfig';
 
 interface Point {
   key: string; label: string; date: string;
@@ -80,7 +80,20 @@ export default function NetWorthChart({ from, to, basis, refreshKey }: Props) {
       legend: { display: true, position: 'bottom' as const },
       tooltip: {
         callbacks: {
-          label: (c) => `${c.dataset.label}: ${formatCurrency(Math.abs(Number(c.parsed.y)))}`,
+          // The debt dataset is negated for display (see its comment above): its
+          // bars sit below the axis, and position already conveys "this is owed,"
+          // so Math.abs here is correct — a minus sign on top would read as a
+          // double negative. Every other dataset (the two asset bars, and the net
+          // worth line) is not negated for display, and can be genuinely negative
+          // (an overdrawn depository account, or a net-worth deficit), so those
+          // must keep their true sign. Distinguish by dataset.stack, not by the
+          // number's own sign — a sign-based rule would misfire on exactly the
+          // asset-side negative this is meant to reveal.
+          label: (c) => {
+            const raw = Number(c.parsed.y);
+            const shown = c.dataset.stack === 'debt' ? formatCurrency(raw) : formatSignedCurrency(raw);
+            return `${c.dataset.label}: ${shown}`;
+          },
           afterBody: (items) => {
             const p = points[items[0].dataIndex];
             return p?.missing.length ? [`Excludes ${p.missing.length} unvalued item(s)`] : [];

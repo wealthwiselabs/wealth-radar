@@ -67,6 +67,26 @@ describe('BalanceSheet', () => {
     // 1,150,000 house less a 1,300,000 mortgage: underwater by 150,000.
     expect(out).toContain('-$150,000');
   });
+
+  it('renders an overdrawn depository account with a minus sign, not as a bare positive', () => {
+    // Depository balances are stored signed (sync.ts): an overdrawn checking
+    // account is a real -200, and the register must show that, not hide the
+    // overdraft behind formatCurrency's Math.abs.
+    const out = html([
+      row({ name: 'Checking', group: 'cash', value: -200 }),
+    ]);
+    expect(out).toContain('-$200');
+    // No bare "$200" anywhere (i.e. every "$200" is immediately preceded by "-").
+    expect(out).not.toMatch(/[^-]\$200\b/);
+  });
+
+  it('renders a negative assets-side total signed, so an overdraft is not hidden in aggregate', () => {
+    const out = html([
+      row({ name: 'Checking', group: 'cash', value: -200 }),
+    ]);
+    expect(out).toContain('assets-total');
+    expect(out).toContain('-$200');
+  });
 });
 
 describe('formatSignedCurrency vs formatCurrency', () => {
