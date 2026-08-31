@@ -55,9 +55,21 @@ export function buildWaterfall(rows: RegisterRow[]): WaterfallStep[] {
   return steps;
 }
 
+const CHART_HEIGHT = 160;
+
 export default function NetWorthWaterfall({ rows }: { rows: RegisterRow[] }) {
   const steps = useMemo(() => buildWaterfall(rows), [rows]);
-  const peak = Math.max(...steps.map((s) => Math.max(s.runningAfter, s.runningAfter - s.delta)), 1);
+
+  // Scale from the FULL range of the running total, including below zero —
+  // a household whose liabilities exceed its assets (e.g. a new mortgage) will
+  // swing the running total negative, and a bar that only accounts for the
+  // high side of each step's range would overflow its container and produce
+  // a negative margin. Always include 0 so the baseline sits inside the
+  // range, and guard the degenerate all-zero case so nothing divides by zero.
+  const bounds = steps.flatMap((s) => [s.runningAfter, s.runningAfter - s.delta]);
+  const lo = Math.min(0, ...bounds);
+  const hi = Math.max(0, ...bounds);
+  const span = hi - lo || 1;
 
   const color = (kind: WaterfallStep['kind']) =>
     kind === 'liability' ? CHART_DANGER : kind === 'total' ? CHART_INK : CHART_PALETTE[0];
@@ -72,14 +84,14 @@ export default function NetWorthWaterfall({ rows }: { rows: RegisterRow[] }) {
         {steps.map((s) => {
           const top = Math.max(s.runningAfter, s.runningAfter - s.delta);
           const bottom = Math.min(s.runningAfter, s.runningAfter - s.delta);
-          const height = ((top - bottom) / peak) * 160;
-          const offset = (bottom / peak) * 160;
+          const height = Math.max(((top - bottom) / span) * CHART_HEIGHT, 3);
+          const offset = ((bottom - lo) / span) * CHART_HEIGHT;
           return (
             <div key={s.label} className="flex-1 flex flex-col items-center justify-end" style={{ height: 200 }}>
               <div
                 title={`${s.label}: ${formatCurrency(s.delta)}`}
                 style={{
-                  width: '100%', height: Math.max(height, 3), marginBottom: offset,
+                  width: '100%', height, marginBottom: offset,
                   background: color(s.kind), borderRadius: 4,
                 }}
               />

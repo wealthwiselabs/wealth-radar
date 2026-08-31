@@ -34,4 +34,12 @@ describe('buildWaterfall', () => {
     ]);
     expect(steps.map((s) => s.label)).toEqual(['Cash', 'Net worth']);
   });
+
+  it('lets liabilities exceed assets, producing a negative net worth', () => {
+    const steps = buildWaterfall([
+      row({ name: 'Checking', group: 'cash', value: 100_000 }),
+      row({ name: 'Mortgage', group: 'debt', side: 'liability', value: 400_000 }),
+    ]);
+    expect(steps.at(-1)).toMatchObject({ kind: 'total', runningAfter: -300_000 });
+  });
 });
