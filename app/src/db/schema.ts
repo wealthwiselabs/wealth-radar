@@ -7,7 +7,7 @@ export const accounts = sqliteTable('accounts', {
   mask: text('mask'),                            // last 4, nullable
   owner: text('owner').notNull().default(''),    // free text; '' = unassigned. Selectable values come from src/lib/owners.ts
   nameSource: text('name_source').notNull().default('derived'), // derived | user
-  accountClass: text('account_class').notNull().default('spending'), // spending | investment | liability
+  accountClass: text('account_class').notNull().default('spending'), // spending | investment | liability | asset
   purpose: text('purpose').notNull().default('portfolio'), // portfolio | reserve | insurance
   type: text('type').notNull().default('unknown'),
   subtype: text('subtype'),
@@ -16,6 +16,16 @@ export const accounts = sqliteTable('accounts', {
   plaidAccountId: text('plaid_account_id'),
   closedAtMonth: text('closed_at_month'),
   status: text('status').notNull().default('active'), // active | closed
+  // Expected refresh cadence for a manually-valued item. NULL = never nag,
+  // which is correct for every Plaid-fed account.
+  reviewIntervalMonths: integer('review_interval_months'),
+  // A liability may point at the asset securing it: mortgage -> house,
+  // auto loan -> car. NULL for a credit card.
+  securedByAccountId: text('secured_by_account_id'),
+  // Phase 3. NULL means manual, which is the default for every account.
+  valuationProvider: text('valuation_provider'),
+  // The provider's lookup key — for RentCast, the property address.
+  valuationRef: text('valuation_ref'),
   createdAt: text('created_at').notNull(),
   modifiedAt: text('modified_at').notNull(),
 }, (t) => ({
@@ -235,6 +245,27 @@ export const agentMemory = sqliteTable('agent_memory', {
   value: text('value').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
+
+export const balanceSnapshots = sqliteTable('balance_snapshots', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  asOf: text('as_of').notNull(),                 // YYYY-MM-DD
+  month: text('month').notNull(),                // YYYY-MM
+  // ALWAYS a positive magnitude. A liability of $8,400 is 8400, never -8400:
+  // that is how the statement reads, and a sign-flip bug in a rollup is silent.
+  // Direction comes from netWorthSide(account) at read time.
+  balance: real('balance').notNull().default(0),
+  source: text('source').notNull().default('manual'), // plaid | manual | statement | estimate
+  note: text('note').notNull().default(''),
+  // Phase 3 AVM range. An estimate carries bounds; a typed value does not.
+  valueLow: real('value_low'),
+  valueHigh: real('value_high'),
+  createdAt: text('created_at').notNull(),
+  modifiedAt: text('modified_at').notNull(),
+}, (t) => ({
+  uniq: unique('balsnap_account_asof').on(t.accountId, t.asOf),
+  byMonth: index('balsnap_month').on(t.month),
+}));
 
 export const investmentTransactions = sqliteTable('investment_transactions', {
   id: text('id').primaryKey(),
