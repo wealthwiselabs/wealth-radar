@@ -1,11 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
 import { onDataChanged } from '@/lib/dataEvents';
 import { formatCurrency } from '@/lib/chartConfig';
+import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
+import { PRESET_LABELS } from '@/lib/timeRange';
 import NetWorthChart from '@/app/components/netWorth/NetWorthChart';
 import NetWorthWaterfall from '@/app/components/netWorth/NetWorthWaterfall';
 import StaleStrip from '@/app/components/netWorth/StaleStrip';
@@ -71,6 +73,20 @@ export default function NetWorthPage() {
   useEffect(() => { refreshAll(); }, [refreshAll]);
   useRefreshOnFocus(refreshAll);
   useEffect(() => onDataChanged(refreshAll), [refreshAll]);
+
+  // Publish the balance-sheet headline figures so the assistant can "see"
+  // this page, mirroring the Investments page's viewSnapshot.
+  const viewSnapshot = useMemo(() => totals ? ({
+    route: '/net-worth',
+    label: 'Net worth',
+    timeRange: PRESET_LABELS[preset],
+    highlights: [
+      { label: 'Net worth', value: formatCurrency(totals.net) },
+      { label: 'Assets', value: formatCurrency(totals.assets) },
+      { label: 'Liabilities', value: formatCurrency(totals.liabilities) },
+    ],
+  }) : null, [totals, preset]);
+  usePublishViewContext(loading || error ? null : viewSnapshot);
 
   return (
     <main className="min-h-screen p-[var(--space-6)] max-w-6xl mx-auto">
