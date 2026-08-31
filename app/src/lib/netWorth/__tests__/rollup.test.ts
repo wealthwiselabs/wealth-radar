@@ -79,6 +79,30 @@ describe('netWorthAt', () => {
     expect(netWorthAt(ctx, '2026-07-31').net).toBe(0);
     expect(netWorthAt(ctx, '2026-07-31').missing).toEqual([]);
   });
+
+  it('excludes a closed account with no closing month rather than counting it forever', async () => {
+    const { db } = makeTmpDb();
+    const car = addAccount(db, { name: 'Car', subtype: 'vehicle', status: 'closed', closedAtMonth: null });
+    addBalance(db, car, '2026-01-01', 30_000);
+    const totals = netWorthAt(await loadNetWorthContext(db), '2026-03-31');
+    expect(totals.net).toBe(0);
+    expect(totals.missing).toEqual([]);
+  });
+
+  // netWorthSide returns 'excluded' when accountClass matches none of its known
+  // values. The accounts.account_class column is unconstrained text (no DB or
+  // TS enum), so a legacy/unrecognized value is a real, reachable row shape —
+  // not a contrived one. Such a row must stay out of both the totals AND
+  // missing[]: it was never asked about, so it is not "unknown," it's opted out.
+  it('keeps an unrecognized-accountClass account out of both the totals and missing', async () => {
+    const { db } = makeTmpDb();
+    const mystery = addAccount(db, { name: 'Mystery', accountClass: 'other' });
+    addBalance(db, mystery, '2026-08-01', 999_999);
+    const totals = netWorthAt(await loadNetWorthContext(db), '2026-08-30');
+    expect(totals.net).toBe(0);
+    expect(totals.assets).toBe(0);
+    expect(totals.missing).toEqual([]);
+  });
 });
 
 describe('netWorthSeries', () => {
