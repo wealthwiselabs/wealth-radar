@@ -1,9 +1,10 @@
 import type { NetWorthContext, Reading } from '@/lib/netWorth/read';
 
-function latestAtOrBefore(readings: Reading[], accountId: string, date: string): number | null {
+/** `readings` must already be narrowed to one account (e.g. via a NetWorthContext byAccount map). */
+function latestAtOrBefore(readings: Reading[] | undefined, date: string): number | null {
+  if (!readings) return null;
   let best: Reading | null = null;
   for (const r of readings) {
-    if (r.accountId !== accountId) continue;
     if (r.asOf > date) continue;
     if (best === null || r.asOf > best.asOf) best = r;
   }
@@ -29,8 +30,8 @@ function latestAtOrBefore(readings: Reading[], accountId: string, date: string):
 export function valuationAt(ctx: NetWorthContext, accountId: string, date: string): number | null {
   const account = ctx.accounts.find((a) => a.id === accountId);
   const preferInvestments = account?.accountClass === 'investment';
-  const first = preferInvestments ? ctx.investments : ctx.balances;
-  const second = preferInvestments ? ctx.balances : ctx.investments;
-  const primary = latestAtOrBefore(first, accountId, date);
-  return primary !== null ? primary : latestAtOrBefore(second, accountId, date);
+  const first = preferInvestments ? ctx.investmentsByAccount : ctx.balancesByAccount;
+  const second = preferInvestments ? ctx.balancesByAccount : ctx.investmentsByAccount;
+  const primary = latestAtOrBefore(first.get(accountId), date);
+  return primary !== null ? primary : latestAtOrBefore(second.get(accountId), date);
 }

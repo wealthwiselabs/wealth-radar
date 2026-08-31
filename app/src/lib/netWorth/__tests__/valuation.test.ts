@@ -70,4 +70,16 @@ describe('valuationAt', () => {
     const ctx = await loadNetWorthContext(db);
     expect(valuationAt(ctx, id, '2026-08-30')).toBe(42_000);
   });
+
+  it('falls back to investment_snapshots for a non-investment account with no balance reading', async () => {
+    const { db } = makeTmpDb();
+    const id = addAccount(db, { name: 'Old brokerage rollover', accountClass: 'asset' });
+    db.insert(investmentSnapshots).values({
+      id: randomUUID(), accountId: id, asOf: '2026-05-01', month: '2026-05',
+      source: 'manual', totalValue: 15_000, holdingsComplete: false, note: '',
+      createdAt: NOW, modifiedAt: NOW,
+    }).run();
+    const ctx = await loadNetWorthContext(db);
+    expect(valuationAt(ctx, id, '2026-08-30')).toBe(15_000);
+  });
 });
