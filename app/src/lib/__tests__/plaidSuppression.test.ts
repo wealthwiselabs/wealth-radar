@@ -16,7 +16,9 @@ function acct(over: Partial<AccountRow> = {}): AccountRow {
     id: 'a1', name: 'Brokerage', institution: 'Morgan Stanley', mask: '3100', owner: 'Alex',
     nameSource: 'derived', accountClass: 'investment', purpose: 'portfolio', type: 'investment',
     subtype: null, origin: 'plaid', plaidItemId: 'it1', plaidAccountId: 'pa-1',
-    closedAtMonth: null, status: 'active', createdAt: NOW, modifiedAt: NOW, ...over,
+    closedAtMonth: null, status: 'active',
+    reviewIntervalMonths: null, securedByAccountId: null, valuationProvider: null, valuationRef: null,
+    createdAt: NOW, modifiedAt: NOW, ...over,
   };
 }
 

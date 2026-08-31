@@ -83,6 +83,10 @@ export async function createManualAccount(
     plaidAccountId: null,
     closedAtMonth: null,
     status: 'active',
+    reviewIntervalMonths: null,
+    securedByAccountId: null,
+    valuationProvider: null,
+    valuationRef: null,
     createdAt: now,
     modifiedAt: now,
   };
@@ -166,6 +170,10 @@ export async function resolveOrCreateAccount(input: ResolveAccountInput, db: Db 
     plaidAccountId: input.plaidAccountId ?? null,
     closedAtMonth: null,
     status: 'active',
+    reviewIntervalMonths: null,
+    securedByAccountId: null,
+    valuationProvider: null,
+    valuationRef: null,
     createdAt: now,
     modifiedAt: now,
   };
