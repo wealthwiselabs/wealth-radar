@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
-import { accounts, balanceSnapshots } from '@/db/schema';
+import { accounts, balanceSnapshots, investmentSnapshots } from '@/db/schema';
 import { catalogByKey } from '@/lib/netWorth/catalog';
 
 type Db = ReturnType<typeof getDb>;
@@ -103,10 +103,15 @@ export async function closeNetWorthAccount(id: string, closedAtMonth: string, db
  *
  * Once anything has been recorded, deletion would rewrite past periods on the
  * trend chart — "I sold my car" must not erase a year of net worth history.
- * That case is a close, not a delete.
+ * That case is a close, not a delete. History can live in either snapshot
+ * table: an insurance-purpose investment account (e.g. an IUL policy) is
+ * valued through investment_snapshots, never balance_snapshots, so both must
+ * be checked or that history slips through unguarded.
  */
 export async function deleteNetWorthAccount(id: string, db: Db = getDb()): Promise<void> {
-  const any = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).all();
-  if (any.length > 0) throw new AccountHasHistoryError(id);
+  const balances = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).all();
+  if (balances.length > 0) throw new AccountHasHistoryError(id);
+  const investments = db.select().from(investmentSnapshots).where(eq(investmentSnapshots.accountId, id)).all();
+  if (investments.length > 0) throw new AccountHasHistoryError(id);
   db.delete(accounts).where(eq(accounts.id, id)).run();
 }

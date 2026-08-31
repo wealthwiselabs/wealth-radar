@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { makeTmpDb } from '@/test/tmpDb';
-import { accounts, balanceSnapshots } from '@/db/schema';
+import { accounts, balanceSnapshots, investmentSnapshots } from '@/db/schema';
 import {
   upsertBalanceSnapshot, createNetWorthAccount, closeNetWorthAccount,
   deleteNetWorthAccount, AccountHasHistoryError,
@@ -74,6 +74,20 @@ describe('upsertBalanceSnapshot', () => {
     const row = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).get();
     expect(row?.balance).toBe(1_150_000);
   });
+
+  it('clears a stale AVM range when a manual value overwrites an estimate', async () => {
+    const { db } = makeTmpDb();
+    const id = await createNetWorthAccount({ catalogKey: 'primary_residence', name: 'Home' }, db);
+    await upsertBalanceSnapshot(
+      { accountId: id, asOf: '2026-08-30', balance: 999_000, source: 'estimate', valueLow: 950_000, valueHigh: 1_050_000 },
+      db,
+    );
+    await upsertBalanceSnapshot({ accountId: id, asOf: '2026-08-30', balance: 1_150_000, source: 'manual' }, db);
+    const row = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).get();
+    expect(row?.balance).toBe(1_150_000);
+    expect(row?.valueLow).toBeNull();
+    expect(row?.valueHigh).toBeNull();
+  });
 });
 
 describe('removal', () => {
@@ -97,6 +111,18 @@ describe('removal', () => {
   it('refuses to delete an account with history', async () => {
     const { db } = makeTmpDb();
     const id = await createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 30_000 }, db);
+    await expect(deleteNetWorthAccount(id, db)).rejects.toBeInstanceOf(AccountHasHistoryError);
+  });
+
+  it('refuses to delete an account whose history lives only in investment snapshots', async () => {
+    const { db } = makeTmpDb();
+    const id = await createNetWorthAccount({ catalogKey: 'life_insurance_cash_value', name: 'IUL' }, db);
+    const NOW = new Date().toISOString();
+    db.insert(investmentSnapshots).values({
+      id: randomUUID(), accountId: id, asOf: '2026-06-01', month: '2026-06',
+      source: 'manual', totalValue: 68_000, holdingsComplete: false, note: '',
+      createdAt: NOW, modifiedAt: NOW,
+    }).run();
     await expect(deleteNetWorthAccount(id, db)).rejects.toBeInstanceOf(AccountHasHistoryError);
   });
 });
