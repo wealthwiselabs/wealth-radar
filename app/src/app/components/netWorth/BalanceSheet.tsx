@@ -41,6 +41,11 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
     // blur on this still-focused element — that re-fires onBlur's own
     // commit(). Clearing draft here first means that re-entrant call sees an
     // empty draft and no-ops, so one Enter can only ever produce one POST.
+    // If the write fails, restore `raw` (captured above) below — a failed
+    // save must not silently discard what the user typed. The restore always
+    // happens after the await, by which time the re-entrant blur has already
+    // fired and no-oped against the empty draft, so this can't reopen the
+    // double-POST: nothing re-reads `draft` synchronously after this point.
     setDraft('');
     setSaving(true);
     try {
@@ -51,12 +56,15 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${res.status}`);
+        setError(typeof body.error === 'string' ? body.error : `HTTP ${res.status}`);
+        setDraft(raw);
+        return;
       }
       notifyDataChanged();
       onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save.');
+      setDraft(raw);
     } finally {
       setSaving(false);
     }
