@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getDb } from '@/db/client';
+import { balanceSnapshots } from '@/db/schema';
 import { loadNetWorthContext } from '@/lib/netWorth/read';
 import { netWorthAt } from '@/lib/netWorth/rollup';
 import { valuationAt } from '@/lib/netWorth/valuation';
@@ -12,6 +14,15 @@ export async function GET(_request: Request) {
     const today = new Date().toISOString().slice(0, 10);
     const totals = netWorthAt(ctx, today);
 
+    // The merged Reading shape in read.ts (used for balances + investments)
+    // strips valueLow/valueHigh, since only balance_snapshots carries a range.
+    // Look those columns up directly, keyed by (accountId, asOf), rather than
+    // widening that shared type for one column pair only property rows use.
+    const rangeByAccountAndAsOf = new Map<string, { low: number | null; high: number | null }>();
+    for (const s of getDb().select().from(balanceSnapshots).all()) {
+      rangeByAccountAndAsOf.set(`${s.accountId}::${s.asOf}`, { low: s.valueLow, high: s.valueHigh });
+    }
+
     const rows = ctx.accounts
       .filter((a) => netWorthSide(a) !== 'excluded' && a.status !== 'closed')
       .map((a) => {
@@ -19,6 +30,7 @@ export async function GET(_request: Request) {
           .filter((r) => r.accountId === a.id)
           .sort((x, y) => (x.asOf < y.asOf ? 1 : -1));
         const latest = readings[0] ?? null;
+        const range = latest ? rangeByAccountAndAsOf.get(`${a.id}::${latest.asOf}`) : null;
         return {
           accountId: a.id,
           name: a.name,
@@ -29,8 +41,8 @@ export async function GET(_request: Request) {
           source: latest?.source ?? null,
           reviewIntervalMonths: a.reviewIntervalMonths ?? null,
           securedByAccountId: a.securedByAccountId ?? null,
-          valueLow: null as number | null,
-          valueHigh: null as number | null,
+          valueLow: range?.low ?? null,
+          valueHigh: range?.high ?? null,
           // Delete is offered only while nothing has been recorded; otherwise the
           // only safe removal is a close, which preserves past periods.
           canDelete: readings.length === 0,

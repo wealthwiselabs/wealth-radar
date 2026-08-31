@@ -71,6 +71,30 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
     }
   }
 
+  async function refreshEstimate() {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/net-worth/estimate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ accountId: row.accountId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // 404 (no provider) and 409 (already refreshed today) are ordinary
+        // outcomes, not faults — show what the server said and move on.
+        setError(typeof body.error === 'string' ? body.error : `HTTP ${res.status}`);
+        return;
+      }
+      notifyDataChanged();
+      onChanged();
+    } catch {
+      setError('Could not reach the valuation service.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove() {
     // Two verbs, deliberately. Deleting an item that has recorded values would
     // rewrite past periods on the trend chart — "I sold my car" must not erase a
@@ -114,6 +138,14 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
         <span className="text-small text-[var(--color-text-base-default)] tabular-nums">
           {row.value === null ? '—' : formatCurrency(row.value)}
         </span>
+        {row.source === 'estimate' && row.valueLow !== null && row.valueHigh !== null && (
+          /* An AVM is a range, not a measurement. Showing only the midpoint beside a
+             typed figure would present a model output as fact. */
+          <span className="text-xsmall text-[var(--color-text-base-subdued)]"
+            title={`Estimated range ${formatCurrency(row.valueLow)} – ${formatCurrency(row.valueHigh)}`}>
+            est.
+          </span>
+        )}
         <input
           aria-label={`Value for ${row.name}`}
           className="origin-input w-28"
@@ -125,6 +157,17 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
           onKeyDown={(e) => { if (e.key === 'Enter') void commit(); }}
           onBlur={() => { if (draft.trim() !== '') void commit(); }}
         />
+        {row.group === 'property' && (
+          <button
+            type="button"
+            className="origin-btn origin-btn-ghost"
+            aria-label={`Refresh estimate for ${row.name}`}
+            disabled={saving}
+            onClick={() => { void refreshEstimate(); }}
+          >
+            Refresh estimate
+          </button>
+        )}
         <button
           type="button"
           className="origin-btn origin-btn-secondary"
