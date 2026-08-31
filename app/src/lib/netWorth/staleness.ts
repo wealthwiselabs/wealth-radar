@@ -9,8 +9,14 @@ export interface StaleAccount {
   monthsOverdue: number;
 }
 
-/** Whole months between two YYYY-MM-DD dates, by calendar month and day-of-month. */
-function monthsBetween(from: string, to: string): number {
+/**
+ * Whole months between two YYYY-MM-DD dates, by calendar month and
+ * day-of-month. Exported so callers outside this module (the register's
+ * on-row age display) share this exact adjustment instead of re-deriving
+ * their own — the server and the client must never disagree about what
+ * counts as stale.
+ */
+export function monthsBetween(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number);
   const [ty, tm, td] = to.split('-').map(Number);
   let months = (ty - fy) * 12 + (tm - fm);

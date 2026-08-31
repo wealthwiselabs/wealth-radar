@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import BalanceSheet from '@/app/components/netWorth/BalanceSheet';
+import { formatCurrency, formatSignedCurrency } from '@/lib/chartConfig';
 import type { RegisterRow } from '@/app/net-worth/page';
 
 // Static rendering, matching MarkdownMessage.test.ts — this repo has no jsdom or
@@ -55,5 +56,27 @@ describe('BalanceSheet', () => {
     const fresh = html([row({ lastAsOf: '2026-08-01', reviewIntervalMonths: 12 })]);
     expect(stale).not.toBe(fresh);
     expect(stale).toContain('2020-01-01');
+  });
+
+  it('renders negative equity (underwater) with a minus sign, not as a plain positive figure', () => {
+    const out = html([
+      row({}), // Home, value 1,150,000
+      row({ accountId: 'a2', name: 'Mortgage', side: 'liability', group: 'debt',
+            value: 1_300_000, securedByAccountId: 'a1' }),
+    ]);
+    // 1,150,000 house less a 1,300,000 mortgage: underwater by 150,000.
+    expect(out).toContain('-$150,000');
+  });
+});
+
+describe('formatSignedCurrency vs formatCurrency', () => {
+  it('formatSignedCurrency preserves a negative sign', () => {
+    expect(formatSignedCurrency(-150_000)).toBe('-$150,000');
+    expect(formatSignedCurrency(150_000)).toBe('$150,000');
+  });
+
+  it('formatCurrency discards sign (unchanged legacy behaviour for chart tooltips/axes)', () => {
+    expect(formatCurrency(-150_000)).toBe('$150,000');
+    expect(formatCurrency(150_000)).toBe('$150,000');
   });
 });

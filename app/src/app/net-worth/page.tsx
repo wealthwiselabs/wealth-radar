@@ -5,7 +5,7 @@ import TimeRangeDropdown from '@/app/components/TimeRangeDropdown';
 import { useTimeRange } from '@/app/hooks/useTimeRange';
 import { useRefreshOnFocus } from '@/app/hooks/useRefreshOnFocus';
 import { onDataChanged } from '@/lib/dataEvents';
-import { formatCurrency } from '@/lib/chartConfig';
+import { formatCurrency, formatSignedCurrency } from '@/lib/chartConfig';
 import { usePublishViewContext } from '@/app/hooks/usePublishViewContext';
 import { PRESET_LABELS } from '@/lib/timeRange';
 import NetWorthChart from '@/app/components/netWorth/NetWorthChart';
@@ -81,7 +81,7 @@ export default function NetWorthPage() {
     label: 'Net worth',
     timeRange: PRESET_LABELS[preset],
     highlights: [
-      { label: 'Net worth', value: formatCurrency(totals.net) },
+      { label: 'Net worth', value: formatSignedCurrency(totals.net) },
       { label: 'Assets', value: formatCurrency(totals.assets) },
       { label: 'Liabilities', value: formatCurrency(totals.liabilities) },
     ],
@@ -109,7 +109,7 @@ export default function NetWorthPage() {
         <div className="space-y-[var(--space-6)]">
           <div>
             <p className="text-small text-[var(--color-text-base-subdued)]">Net worth</p>
-            <p className="heading-large text-[var(--color-text-base-default)]">{formatCurrency(totals.net)}</p>
+            <p className="heading-large text-[var(--color-text-base-default)]">{formatSignedCurrency(totals.net)}</p>
             <p className="text-xsmall text-[var(--color-text-base-subdued)]">
               {formatCurrency(totals.assets)} in assets, {formatCurrency(totals.liabilities)} in debt
             </p>

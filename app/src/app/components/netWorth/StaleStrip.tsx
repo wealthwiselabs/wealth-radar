@@ -13,7 +13,10 @@ export default function StaleStrip({ refreshKey }: { refreshKey: number }) {
       try {
         const res = await fetch('/api/net-worth/stale', { cache: 'no-store' });
         const body = await res.json();
-        if (!cancelled && res.ok) setStale(body.stale ?? []);
+        if (cancelled) return;
+        // A non-OK response must not leave the previous fetch's items on
+        // screen looking current — reset rather than hold stale state.
+        setStale(res.ok ? (body.stale ?? []) : []);
       } catch {
         // A failed staleness check is not worth an error state — the register
         // still shows each row's age, which is the same information.

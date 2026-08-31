@@ -78,7 +78,9 @@ export const chartDefaults = {
   },
 };
 
-// Format currency for tooltips
+// Format currency for tooltips. Use this ONLY for values that are positive
+// magnitudes by construction (e.g. assets, liabilities, axis ticks) — it
+// discards sign, so a genuinely negative figure would render as if positive.
 export function formatCurrency(value: number): string {
   return Math.abs(value).toLocaleString('en-US', {
     style: 'currency',
@@ -86,6 +88,14 @@ export function formatCurrency(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+}
+
+// Use this instead of formatCurrency wherever a value can legitimately be
+// negative (net worth, equity, waterfall deltas) — it keeps the sign, e.g.
+// "-$300,000", rather than silently flipping a debt-heavy figure positive.
+export function formatSignedCurrency(value: number): string {
+  const sign = value < 0 ? '-' : '';
+  return `${sign}${formatCurrency(value)}`;
 }
 
 /**

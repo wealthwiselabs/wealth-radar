@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CHART_PALETTE, CHART_DANGER, CHART_INK, formatCurrency } from '@/lib/chartConfig';
+import { CHART_PALETTE, CHART_DANGER, CHART_INK, formatSignedCurrency } from '@/lib/chartConfig';
 import type { RegisterRow } from '@/app/net-worth/page';
 
 export interface WaterfallStep {
@@ -89,7 +89,7 @@ export default function NetWorthWaterfall({ rows }: { rows: RegisterRow[] }) {
           return (
             <div key={s.label} className="flex-1 flex flex-col items-center justify-end" style={{ height: 200 }}>
               <div
-                title={`${s.label}: ${formatCurrency(s.delta)}`}
+                title={`${s.label}: ${formatSignedCurrency(s.delta)}`}
                 style={{
                   width: '100%', height, marginBottom: offset,
                   background: color(s.kind), borderRadius: 4,
@@ -99,7 +99,7 @@ export default function NetWorthWaterfall({ rows }: { rows: RegisterRow[] }) {
                 {s.label}
               </span>
               <span className="text-xsmall text-[var(--color-text-base-default)] tabular-nums">
-                {formatCurrency(s.delta)}
+                {formatSignedCurrency(s.delta)}
               </span>
             </div>
           );

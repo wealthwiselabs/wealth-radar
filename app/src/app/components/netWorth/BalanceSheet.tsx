@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { formatCurrency } from '@/lib/chartConfig';
+import { formatCurrency, formatSignedCurrency } from '@/lib/chartConfig';
 import { notifyDataChanged } from '@/lib/dataEvents';
+import { monthsBetween } from '@/lib/netWorth/staleness';
 import type { RegisterRow } from '@/app/net-worth/page';
 
 function ageLabel(lastAsOf: string | null, interval: number | null): { text: string; stale: boolean } {
   if (!lastAsOf) return { text: 'never valued', stale: true };
-  const months =
-    (new Date().getFullYear() - Number(lastAsOf.slice(0, 4))) * 12 +
-    (new Date().getMonth() + 1 - Number(lastAsOf.slice(5, 7)));
+  // Shares the server's exact month/day adjustment (staleness.ts) so a row
+  // can never show the warning colour while StaleStrip disagrees, or vice versa.
+  const today = new Date().toISOString().slice(0, 10);
+  const months = monthsBetween(lastAsOf, today);
   const stale = interval !== null && months > interval;
   return { text: `as of ${lastAsOf}`, stale };
 }
@@ -21,14 +23,25 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
   const age = ageLabel(row.lastAsOf, row.reviewIntervalMonths);
 
   async function commit() {
-    const parsed = Number(draft.replace(/[$,\s]/g, ''));
-    if (draft.trim() === '') return;
-    if (!Number.isFinite(parsed) || parsed < 0) {
+    const raw = draft;
+    if (raw.trim() === '') return;
+    const parsed = Number(raw.replace(/[$,\s]/g, ''));
+    if (!Number.isFinite(parsed)) {
+      setError('Enter a valid number.');
+      return;
+    }
+    if (parsed < 0) {
       // Balances are magnitudes; direction comes from the account's class.
       setError('Enter a positive amount — debts are entered as what you owe.');
       return;
     }
     setError(null);
+    // Clear the draft synchronously, before the await. Setting `saving` below
+    // makes the input `disabled`, which the browser turns into a synchronous
+    // blur on this still-focused element — that re-fires onBlur's own
+    // commit(). Clearing draft here first means that re-entrant call sees an
+    // empty draft and no-ops, so one Enter can only ever produce one POST.
+    setDraft('');
     setSaving(true);
     try {
       const res = await fetch('/api/net-worth/snapshot', {
@@ -40,7 +53,6 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
         const body = await res.json().catch(() => ({}));
         throw new Error(typeof body.error === 'string' ? body.error : `HTTP ${res.status}`);
       }
-      setDraft('');
       notifyDataChanged();
       onChanged();
     } catch (e) {
@@ -105,7 +117,7 @@ function SecuredUnder({ asset, allRows }: { asset: RegisterRow; allRows: Registe
       ))}
       <p className="text-xsmall text-[var(--color-text-base-default)]">
         equity <span data-testid={`equity-${asset.accountId}`} className="tabular-nums">
-          {formatCurrency(asset.value - debt)}
+          {formatSignedCurrency(asset.value - debt)}
         </span>
       </p>
     </div>
