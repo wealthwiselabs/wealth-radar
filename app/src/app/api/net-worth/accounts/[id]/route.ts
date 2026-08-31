@@ -12,6 +12,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     const body = await request.json() as {
       name?: string; reviewIntervalMonths?: number | null;
       securedByAccountId?: string | null; closedAtMonth?: string;
+      valuationProvider?: string | null; valuationRef?: string | null;
     };
     if (body.closedAtMonth) {
       await closeNetWorthAccount(id, body.closedAtMonth);
@@ -21,6 +22,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     if (body.name !== undefined) patch.name = body.name;
     if (body.reviewIntervalMonths !== undefined) patch.reviewIntervalMonths = body.reviewIntervalMonths;
     if (body.securedByAccountId !== undefined) patch.securedByAccountId = body.securedByAccountId;
+    // null clears either field, so a user can turn estimates back off.
+    if (body.valuationProvider !== undefined) patch.valuationProvider = body.valuationProvider;
+    if (body.valuationRef !== undefined) patch.valuationRef = body.valuationRef;
     getDb().update(accounts).set(patch).where(eq(accounts.id, id)).run();
     return NextResponse.json({ ok: true });
   } catch (error) {

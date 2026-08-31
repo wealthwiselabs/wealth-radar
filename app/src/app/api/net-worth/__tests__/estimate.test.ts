@@ -60,6 +60,22 @@ describe('POST /api/net-worth/estimate', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('blocks on a same-day manual row without ever calling the provider', async () => {
+    // upsertBalanceSnapshot is guaranteed to discard an estimate over a
+    // same-day manual entry, so the guard must stop before the network call —
+    // otherwise a refresh burns one of RentCast's 50 monthly requests on a
+    // result that can never be written.
+    process.env.RENTCAST_API_KEY = 'k';
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ price: 999 }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const id = await house('6 Main St');
+    const today = new Date().toISOString().slice(0, 10);
+    await upsertBalanceSnapshot({ accountId: id, asOf: today, balance: 1_150_000, source: 'manual' }, db);
+    const res = await POST(req(id));
+    expect(res.status).toBe(409);
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+  });
+
   it('writes nothing when the provider fails, leaving the item stale', async () => {
     process.env.RENTCAST_API_KEY = 'k';
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 500 })));

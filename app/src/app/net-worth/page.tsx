@@ -26,6 +26,7 @@ export interface RegisterRow {
   securedByAccountId: string | null;
   valueLow: number | null;
   valueHigh: number | null;
+  valuationRef: string | null;
   canDelete: boolean;
 }
 
@@ -37,6 +38,7 @@ export interface Totals {
 export default function NetWorthPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [rows, setRows] = useState<RegisterRow[]>([]);
+  const [providerConfigured, setProviderConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -53,6 +55,7 @@ export default function NetWorthPage() {
       if (!res.ok) throw new Error(typeof body?.error === 'string' ? body.error : `HTTP ${res.status}`);
       setTotals(body.totals);
       setRows(body.rows);
+      setProviderConfigured(Boolean(body.providerConfigured));
     } catch (e) {
       // A failed request must not fall through to an empty balance sheet.
       // "$0 net worth" and "the server is down" look identical otherwise.
@@ -131,7 +134,7 @@ export default function NetWorthPage() {
           <NetWorthChart from={dateRange.startDate} to={dateRange.endDate} basis="monthly" refreshKey={refreshKey} />
           <NetWorthWaterfall rows={rows} />
           <StaleStrip refreshKey={refreshKey} />
-          <BalanceSheet rows={rows} onChanged={refreshAll} />
+          <BalanceSheet rows={rows} onChanged={refreshAll} providerConfigured={providerConfigured} />
           <MissedItemsHint rows={rows} />
         </div>
       ) : null}

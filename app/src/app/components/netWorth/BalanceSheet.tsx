@@ -17,10 +17,14 @@ function ageLabel(lastAsOf: string | null, interval: number | null): { text: str
   return { text: `as of ${lastAsOf}`, stale };
 }
 
-function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
+function Row({ row, onChanged, providerConfigured }: {
+  row: RegisterRow; onChanged: () => void; providerConfigured: boolean;
+}) {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [enabling, setEnabling] = useState(false);
+  const [addressDraft, setAddressDraft] = useState('');
   const age = ageLabel(row.lastAsOf, row.reviewIntervalMonths);
 
   async function commit() {
@@ -95,6 +99,36 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
     }
   }
 
+  async function enableEstimates() {
+    const address = addressDraft.trim();
+    if (!address) {
+      setError('Enter the property address.');
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/net-worth/accounts/${row.accountId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ valuationProvider: 'rentcast', valuationRef: address }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(typeof body.error === 'string' ? body.error : `HTTP ${res.status}`);
+        return;
+      }
+      setEnabling(false);
+      setAddressDraft('');
+      notifyDataChanged();
+      onChanged();
+    } catch {
+      setError('Could not save the address.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove() {
     // Two verbs, deliberately. Deleting an item that has recorded values would
     // rewrite past periods on the trend chart — "I sold my car" must not erase a
@@ -129,7 +163,9 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
           style={{ color: age.stale ? 'var(--color-text-warning)' : 'var(--color-text-base-subdued)' }}
         >
           {age.text}
-          {row.source === 'estimate' ? ' · estimate' : ''}
+          {/* Gated on providerConfigured: with no provider set up, the page must
+              never mention estimates, even for a row an estimate valued in the past. */}
+          {providerConfigured && row.source === 'estimate' ? ' · estimate' : ''}
         </p>
         {error && <p className="text-xsmall text-[var(--color-text-critical)]">{error}</p>}
       </div>
@@ -138,7 +174,7 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
         <span className="text-small text-[var(--color-text-base-default)] tabular-nums">
           {row.value === null ? '—' : formatCurrency(row.value)}
         </span>
-        {row.source === 'estimate' && row.valueLow !== null && row.valueHigh !== null && (
+        {providerConfigured && row.source === 'estimate' && row.valueLow !== null && row.valueHigh !== null && (
           /* An AVM is a range, not a measurement. Showing only the midpoint beside a
              typed figure would present a model output as fact. */
           <span className="text-xsmall text-[var(--color-text-base-subdued)]"
@@ -157,16 +193,63 @@ function Row({ row, onChanged }: { row: RegisterRow; onChanged: () => void }) {
           onKeyDown={(e) => { if (e.key === 'Enter') void commit(); }}
           onBlur={() => { if (draft.trim() !== '') void commit(); }}
         />
-        {row.group === 'property' && (
-          <button
-            type="button"
-            className="origin-btn origin-btn-ghost"
-            aria-label={`Refresh estimate for ${row.name}`}
-            disabled={saving}
-            onClick={() => { void refreshEstimate(); }}
-          >
-            Refresh estimate
-          </button>
+        {/* All estimate UI — enable, refresh, the "est." badge above, and the
+            "· estimate" text — is gated on providerConfigured. With no provider
+            configured server-side, this page must never mention estimates. */}
+        {providerConfigured && row.group === 'property' && (
+          row.valuationRef ? (
+            <button
+              type="button"
+              className="origin-btn origin-btn-ghost"
+              aria-label={`Refresh estimate for ${row.name}`}
+              disabled={saving}
+              onClick={() => { void refreshEstimate(); }}
+            >
+              Refresh estimate
+            </button>
+          ) : enabling ? (
+            <div className="flex flex-col items-end gap-[var(--space-1)]">
+              <p className="text-xsmall text-[var(--color-text-base-subdued)] max-w-[220px] text-right">
+                The address you enter is sent to RentCast, a third party, to estimate this
+                property&apos;s value.
+              </p>
+              <input
+                aria-label={`Address for ${row.name}`}
+                className="origin-input w-48"
+                placeholder="Property address"
+                value={addressDraft}
+                disabled={saving}
+                onChange={(e) => { setAddressDraft(e.target.value); setError(null); }}
+              />
+              <div className="flex gap-[var(--space-2)]">
+                <button
+                  type="button"
+                  className="origin-btn origin-btn-secondary"
+                  disabled={saving}
+                  onClick={() => { void enableEstimates(); }}
+                >
+                  Enable
+                </button>
+                <button
+                  type="button"
+                  className="origin-btn origin-btn-ghost"
+                  disabled={saving}
+                  onClick={() => { setEnabling(false); setAddressDraft(''); setError(null); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="origin-btn origin-btn-ghost"
+              aria-label={`Enable estimates for ${row.name}`}
+              onClick={() => setEnabling(true)}
+            >
+              Enable estimates
+            </button>
+          )
         )}
         <button
           type="button"
@@ -209,9 +292,9 @@ function SecuredUnder({ asset, allRows }: { asset: RegisterRow; allRows: Registe
   );
 }
 
-function Column({ title, side, rows, allRows, testId, onChanged }: {
+function Column({ title, side, rows, allRows, testId, onChanged, providerConfigured }: {
   title: string; side: 'asset' | 'liability'; rows: RegisterRow[]; allRows: RegisterRow[];
-  testId: string; onChanged: () => void;
+  testId: string; onChanged: () => void; providerConfigured: boolean;
 }) {
   const total = rows.reduce((sum, r) => sum + (r.value ?? 0), 0);
   return (
@@ -228,7 +311,7 @@ function Column({ title, side, rows, allRows, testId, onChanged }: {
         ? <p className="text-xsmall text-[var(--color-text-base-subdued)]">Nothing here yet.</p>
         : rows.map((r) => (
             <div key={r.accountId}>
-              <Row row={r} onChanged={onChanged} />
+              <Row row={r} onChanged={onChanged} providerConfigured={providerConfigured} />
               <SecuredUnder asset={r} allRows={allRows} />
             </div>
           ))}
@@ -242,13 +325,15 @@ function Column({ title, side, rows, allRows, testId, onChanged }: {
   );
 }
 
-export default function BalanceSheet({ rows, onChanged }: { rows: RegisterRow[]; onChanged: () => void }) {
+export default function BalanceSheet({ rows, onChanged, providerConfigured = false }: {
+  rows: RegisterRow[]; onChanged: () => void; providerConfigured?: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-[var(--space-4)]">
       <Column title="Assets" side="asset" testId="assets-total" onChanged={onChanged} allRows={rows}
-        rows={rows.filter((r) => r.side === 'asset')} />
+        providerConfigured={providerConfigured} rows={rows.filter((r) => r.side === 'asset')} />
       <Column title="Liabilities" side="liability" testId="liabilities-total" onChanged={onChanged} allRows={rows}
-        rows={rows.filter((r) => r.side === 'liability')} />
+        providerConfigured={providerConfigured} rows={rows.filter((r) => r.side === 'liability')} />
     </div>
   );
 }

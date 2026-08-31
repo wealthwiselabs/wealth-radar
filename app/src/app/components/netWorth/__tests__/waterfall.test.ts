@@ -5,7 +5,7 @@ import type { RegisterRow } from '@/app/net-worth/page';
 const row = (over: Partial<RegisterRow>): RegisterRow => ({
   accountId: 'x', name: 'X', side: 'asset', group: 'other', value: 0,
   lastAsOf: '2026-08-01', source: 'manual', reviewIntervalMonths: null,
-  securedByAccountId: null, valueLow: null, valueHigh: null, canDelete: false, ...over,
+  securedByAccountId: null, valueLow: null, valueHigh: null, valuationRef: null, canDelete: false, ...over,
 });
 
 describe('buildWaterfall', () => {

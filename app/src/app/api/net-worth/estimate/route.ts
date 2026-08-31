@@ -28,12 +28,19 @@ export async function POST(request: NextRequest) {
 
     // Rate guard, checked BEFORE the call. Free tiers are small, and this guard
     // is the only thing between a refresh loop and a burned monthly quota.
+    // Blocks on ANY same-day row, not just a prior estimate: upsertBalanceSnapshot
+    // is guaranteed to discard an estimate over a same-day manual entry, so
+    // calling the provider in that case would burn a request for a result that
+    // can never be written.
     const today = new Date().toISOString().slice(0, 10);
     const already = db.select().from(balanceSnapshots)
       .where(and(eq(balanceSnapshots.accountId, accountId), eq(balanceSnapshots.asOf, today)))
       .get();
-    if (already && already.source === 'estimate') {
-      return NextResponse.json({ error: 'Already refreshed today.' }, { status: 409 });
+    if (already) {
+      const message = already.source === 'manual'
+        ? 'This item has a manual value entered today — an estimate would be discarded, so none was requested.'
+        : 'Already refreshed today.';
+      return NextResponse.json({ error: message }, { status: 409 });
     }
 
     let estimate;
