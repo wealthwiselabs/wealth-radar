@@ -47,4 +47,18 @@ describe('catalog', () => {
     expect(groupForSubtype('credit card')).toBe('debt');
     expect(groupForSubtype('nonsense')).toBe('other');
   });
+
+  it('never maps one subtype to two different groups', () => {
+    const seen = new Map<string, string>();
+    for (const item of CATALOG) {
+      const prior = seen.get(item.subtype);
+      expect(prior === undefined || prior === item.group).toBe(true);
+      seen.set(item.subtype, item.group);
+    }
+  });
+
+  it('resolves an other-liability subtype to debt, not to an asset group', () => {
+    expect(groupForSubtype('other_debt')).toBe('debt');
+    expect(groupForSubtype('other')).toBe('other');
+  });
 });

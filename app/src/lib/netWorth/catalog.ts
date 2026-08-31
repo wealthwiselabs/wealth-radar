@@ -77,7 +77,7 @@ export const CATALOG: CatalogItem[] = [
   debt('policy_loan', 'Policy loan', 'policy_loan', 'other'),
   debt('medical_debt', 'Medical debt', 'medical'),
   debt('taxes_owed', 'Taxes owed', 'tax'),
-  debt('other_liability', 'Other liability', 'other'),
+  debt('other_liability', 'Other liability', 'other_debt'),
 ];
 
 export function catalogByKey(key: string): CatalogItem | undefined {
