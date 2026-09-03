@@ -23,6 +23,8 @@ function Row({ row, onChanged, providerConfigured }: {
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [dropHistory, setDropHistory] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [addressDraft, setAddressDraft] = useState('');
   const age = ageLabel(row.lastAsOf, row.reviewIntervalMonths);
@@ -129,22 +131,26 @@ function Row({ row, onChanged, providerConfigured }: {
     }
   }
 
-  async function remove() {
-    // Two verbs, deliberately. Deleting an item that has recorded values would
-    // rewrite past periods on the trend chart — "I sold my car" must not erase a
-    // year of history. Once anything is recorded, the only removal is a close.
-    const closing = !row.canDelete;
-    const message = closing
-      ? `Close ${row.name}? It stops counting from this month, and past months keep its value.`
-      : `Delete ${row.name}? It has no recorded values, so nothing is lost.`;
-    if (!window.confirm(message)) return;
-    const res = closing
-      ? await fetch(`/api/net-worth/accounts/${row.accountId}`, {
+  /**
+   * One verb in the UI, with the destructive option as an explicit opt-in.
+   *
+   * Two buttons ("Close" for items with history, "Delete" for those without)
+   * made the row's control change meaning depending on data the user cannot
+   * see, and neither label explained what happened to past months. Now every
+   * row offers Close, and the dialog carries the choice: keep the history
+   * (the default, which keeps the trend chart correct for the months you owned
+   * the thing) or remove it too, stated plainly and off by default.
+   */
+  async function remove(alsoRemoveHistory: boolean) {
+    setConfirming(false);
+    const month = new Date().toISOString().slice(0, 7);
+    const res = alsoRemoveHistory
+      ? await fetch(`/api/net-worth/accounts/${row.accountId}?withHistory=true`, { method: 'DELETE' })
+      : await fetch(`/api/net-worth/accounts/${row.accountId}`, {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ closedAtMonth: new Date().toISOString().slice(0, 7) }),
-        })
-      : await fetch(`/api/net-worth/accounts/${row.accountId}`, { method: 'DELETE' });
+          body: JSON.stringify({ closedAtMonth: month }),
+        });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setError(typeof body.error === 'string' ? body.error : 'Could not remove the item.');
@@ -258,11 +264,72 @@ function Row({ row, onChanged, providerConfigured }: {
         <button
           type="button"
           className="origin-btn origin-btn-secondary"
-          aria-label={`Remove ${row.name}`}
-          onClick={() => { void remove(); }}
+          aria-label={`Close ${row.name}`}
+          title="Counts through the end of this month, then stops. You choose whether to keep its past values."
+          onClick={() => { setDropHistory(false); setError(null); setConfirming(true); }}
         >
-          {row.canDelete ? 'Delete' : 'Close'}
+          Close
         </button>
+
+        {confirming && (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-[var(--space-6)]"
+            style={{ background: 'rgba(0,0,0,0.45)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setConfirming(false); }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Close ${row.name}`}
+              className="origin-card p-[var(--space-4)] space-y-[var(--space-3)] w-full max-w-md mt-[var(--space-8)]"
+            >
+              <p className="text-small font-medium text-[var(--color-text-base-default)]">
+                Close {row.name}?
+              </p>
+              <p className="text-xsmall text-[var(--color-text-base-subdued)]">
+                It counts through the end of this month, then stops. Its past values are kept by
+                default, so the months you owned it stay correct on the trend chart.
+              </p>
+
+              <label className="flex items-start gap-[var(--space-2)] text-xsmall text-[var(--color-text-base-default)]">
+                <input
+                  type="checkbox"
+                  aria-label="Also remove its past values"
+                  checked={dropHistory}
+                  onChange={(e) => setDropHistory(e.target.checked)}
+                />
+                <span>
+                  Also remove its past values
+                  {/* Stated before the click, not after. This is the one action
+                      here that changes months already on the chart. */}
+                  <span className="block text-[var(--color-text-warning)]">
+                    Deletes the item and every value recorded for it. Past months will no longer
+                    include it, and this cannot be undone.
+                  </span>
+                </span>
+              </label>
+
+              {error && <p className="text-xsmall text-[var(--color-text-critical)]">{error}</p>}
+
+              <div className="flex gap-[var(--space-2)]">
+                <button
+                  type="button"
+                  className="origin-btn origin-btn-primary"
+                  onClick={() => { void remove(dropHistory); }}
+                >
+                  {dropHistory ? 'Close and remove values' : 'Close item'}
+                </button>
+                <button
+                  type="button"
+                  className="origin-btn origin-btn-secondary"
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -104,3 +104,65 @@ test('an item saved with no value is named in the exclusion banner, never counte
   // Never absorbed as a zero: the total is unchanged, not reduced or padded.
   await expect.poll(() => totalOf(assetsTotal)).toBe(before);
 });
+
+test('the add-item modal can be dismissed without picking anything', async ({ page }) => {
+  // Regression: the sheet's FIRST step rendered no dismiss control at all, so
+  // opening it by accident left no way back except picking an item you did not
+  // want in order to reach a Cancel button.
+  await page.goto('/net-worth');
+  const search = page.getByLabel('Search items');
+
+  // Escape, from the search step.
+  await page.getByRole('button', { name: /add item/i }).first().click();
+  await expect(search).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(search).toBeHidden();
+
+  // Cancel, from the search step.
+  await page.getByRole('button', { name: /add item/i }).first().click();
+  await expect(search).toBeVisible();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await expect(search).toBeHidden();
+
+  // Cancel is still reachable after picking an item, and the dialog keeps the
+  // value typed into it until dismissed rather than closing on a stray click.
+  await page.getByRole('button', { name: /add item/i }).first().click();
+  await page.getByRole('button', { name: 'Car', exact: true }).click();
+  await expect(page.getByLabel('Current value')).toBeVisible();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await expect(page.getByLabel('Current value')).toBeHidden();
+});
+
+test('closing an item confirms first; removing its values takes an explicit opt-in', async ({ page }) => {
+  const name = `E2E NW Closable ${RUN}`;
+  await page.goto('/net-worth');
+
+  await page.getByRole('button', { name: /add item/i }).first().click();
+  await page.getByLabel('Search items').fill('car');
+  await page.getByRole('button', { name: 'Car', exact: true }).click();
+  await page.getByLabel('Name').fill(name);
+  await page.getByLabel('Current value').fill('12345');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByLabel(`Value for ${name}`)).toBeVisible();
+
+  // Close must not act immediately — it confirms, and the confirm is escapable.
+  await page.getByRole('button', { name: `Close ${name}`, exact: true }).click();
+  await expect(page.getByRole('dialog', { name: `Close ${name}` })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByLabel(`Value for ${name}`)).toBeVisible();
+
+  // A plain close keeps the item counting through the END of the closing month —
+  // the register lists exactly what the totals count, so the row is still here
+  // today. That is the behaviour, and the dialog's copy has to match it.
+  await page.getByRole('button', { name: `Close ${name}`, exact: true }).click();
+  await page.getByRole('button', { name: 'Close item', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: `Close ${name}` })).toBeHidden();
+  await expect(page.getByLabel(`Value for ${name}`)).toBeVisible();
+
+  // Ticking the box is the only way to remove recorded values, and it does
+  // take the item off the register immediately.
+  await page.getByRole('button', { name: `Close ${name}`, exact: true }).click();
+  await page.getByLabel('Also remove its past values').check();
+  await page.getByRole('button', { name: 'Close and remove values', exact: true }).click();
+  await expect(page.getByLabel(`Value for ${name}`)).toBeHidden();
+});

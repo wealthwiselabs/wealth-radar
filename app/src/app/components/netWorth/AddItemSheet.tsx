@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CATALOG, type CatalogItem } from '@/lib/netWorth/catalog';
 import { notifyDataChanged } from '@/lib/dataEvents';
 import type { RegisterRow } from '@/app/net-worth/page';
@@ -31,10 +31,20 @@ export default function AddItemSheet({ side, existingAssets, onCreated }: Props)
     ? existingAssets.filter((a) => a.group === picked.securedByGroup)
     : [];
 
-  function reset() {
+  const reset = useCallback(() => {
     setOpen(false); setQuery(''); setPicked(null);
     setName(''); setValue(''); setSecuredBy(''); setError(null);
-  }
+  }, []);
+
+  // Escape closes. Without it the only way out of the first step was to pick an
+  // item you did not want just to reach a Cancel button — the search step had
+  // no dismiss control at all, so opening the sheet by accident trapped you.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') reset(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, reset]);
 
   async function save() {
     if (!picked) return;
@@ -73,8 +83,42 @@ export default function AddItemSheet({ side, existingAssets, onCreated }: Props)
     );
   }
 
+  const title = picked ? `Add ${picked.label.toLowerCase()}` : `Add ${side === 'asset' ? 'an asset' : 'a liability'}`;
+
   return (
-    <div className="origin-card p-[var(--space-4)] space-y-[var(--space-3)]">
+    // Modal rather than an inline panel. Inline, the search step rendered no
+    // dismiss control at all, so opening it by accident left no way back except
+    // picking an item you did not want. A backdrop, an explicit close, and
+    // Escape give three ways out from either step.
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-[var(--space-6)]"
+      style={{ background: 'rgba(0,0,0,0.45)' }}
+      // Only a click on the backdrop ITSELF closes — a click that started
+      // inside the dialog and drifted out (selecting text in an input) must not
+      // discard what the user typed.
+      onClick={(e) => { if (e.target === e.currentTarget) reset(); }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="origin-card p-[var(--space-4)] space-y-[var(--space-3)] w-full max-w-md mt-[var(--space-8)]"
+      >
+        <div className="flex items-center justify-between gap-[var(--space-3)]">
+          <p className="text-small font-medium text-[var(--color-text-base-default)]">{title}</p>
+          <button
+            type="button"
+            // "Close dialog", not "Close": every register row also has a Close
+            // button, and a bare "Close" would be ambiguous to both a screen
+            // reader user scanning the page and to a test selector.
+            aria-label="Close dialog"
+            className="origin-btn origin-btn-ghost"
+            onClick={reset}
+          >
+            Cancel
+          </button>
+        </div>
+
       {!picked ? (
         <>
           <label htmlFor="nw-search" className="text-small text-[var(--color-text-base-subdued)]">Search items</label>
@@ -128,10 +172,11 @@ export default function AddItemSheet({ side, existingAssets, onCreated }: Props)
 
           <div className="flex gap-[var(--space-2)]">
             <button type="button" className="origin-btn origin-btn-primary" onClick={() => { void save(); }}>Save</button>
-            <button type="button" className="origin-btn origin-btn-secondary" onClick={reset}>Cancel</button>
+            <button type="button" className="origin-btn origin-btn-secondary" onClick={() => setPicked(null)}>Back</button>
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

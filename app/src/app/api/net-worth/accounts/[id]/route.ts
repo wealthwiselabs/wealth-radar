@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { accounts } from '@/db/schema';
-import { closeNetWorthAccount, deleteNetWorthAccount, AccountHasHistoryError } from '@/lib/netWorth/write';
+import {
+  closeNetWorthAccount, deleteNetWorthAccount,
+  AccountHasHistoryError, InvestmentHistoryError,
+} from '@/lib/netWorth/write';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -33,13 +36,16 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   }
 }
 
-export async function DELETE(_request: NextRequest, ctx: Ctx) {
+export async function DELETE(request: NextRequest, ctx: Ctx) {
   try {
     const { id } = await ctx.params;
-    await deleteNetWorthAccount(id);
+    // Explicit opt-in from the close dialog's checkbox. Absent it, the history
+    // guard stands — the flag is consent, not a way around the rule.
+    const withHistory = new URL(request.url).searchParams.get('withHistory') === 'true';
+    await deleteNetWorthAccount(id, undefined, { withHistory });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof AccountHasHistoryError) {
+    if (error instanceof AccountHasHistoryError || error instanceof InvestmentHistoryError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }
     console.error('Error deleting net worth item:', error);

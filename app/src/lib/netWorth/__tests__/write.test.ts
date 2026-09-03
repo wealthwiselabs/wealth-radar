@@ -138,3 +138,36 @@ describe('removal', () => {
     await expect(deleteNetWorthAccount(id, db)).rejects.toBeInstanceOf(AccountHasHistoryError);
   });
 });
+
+describe('deleteNetWorthAccount with withHistory', () => {
+  it('deletes the account AND its readings when history removal is explicitly requested', async () => {
+    const { db } = makeTmpDb();
+    const id = await createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 30_000 }, db);
+    await deleteNetWorthAccount(id, db, { withHistory: true });
+    expect(db.select().from(accounts).where(eq(accounts.id, id)).all()).toHaveLength(0);
+    expect(db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).all()).toHaveLength(0);
+  });
+
+  it('still refuses without the flag, so an accidental delete cannot lose history', async () => {
+    const { db } = makeTmpDb();
+    const id = await createNetWorthAccount({ catalogKey: 'car', name: 'Car', value: 30_000 }, db);
+    await expect(deleteNetWorthAccount(id, db)).rejects.toBeInstanceOf(AccountHasHistoryError);
+  });
+
+  it('refuses even WITH the flag when the account carries investment history', async () => {
+    // Investment snapshots belong to the Investments feature — its charts, ROI
+    // and allocation all read them. Letting a checkbox on the net worth
+    // register erase them would damage a different part of the app that the
+    // user is not looking at and did not consent to change.
+    const { db } = makeTmpDb();
+    const id = await createNetWorthAccount({ catalogKey: 'life_insurance_cash_value', name: 'IUL' }, db);
+    const now = new Date().toISOString();
+    db.insert(investmentSnapshots).values({
+      id: randomUUID(), accountId: id, asOf: '2026-06-01', month: '2026-06',
+      source: 'manual', totalValue: 68_000, holdingsComplete: false, note: '',
+      createdAt: now, modifiedAt: now,
+    }).run();
+    await expect(deleteNetWorthAccount(id, db, { withHistory: true }))
+      .rejects.toThrow(/investment/i);
+  });
+});

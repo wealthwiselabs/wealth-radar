@@ -127,10 +127,47 @@ export async function closeNetWorthAccount(id: string, closedAtMonth: string, db
  * valued through investment_snapshots, never balance_snapshots, so both must
  * be checked or that history slips through unguarded.
  */
-export async function deleteNetWorthAccount(id: string, db: Db = getDb()): Promise<void> {
+export class InvestmentHistoryError extends Error {
+  constructor(public accountId: string) {
+    super(
+      'This item has investment history, which the Investments page reads for its ' +
+      'charts and returns. Close it here, or remove it from Investments first.',
+    );
+    this.name = 'InvestmentHistoryError';
+  }
+}
+
+/**
+ * Delete an item.
+ *
+ * By default this refuses once anything has been recorded — deleting an item
+ * with history rewrites past periods on the trend chart, and "I sold my car"
+ * must never erase a year of net worth. `withHistory` is the user's explicit,
+ * confirmed consent to exactly that, taken via a checkbox in the close dialog,
+ * so the guard is bypassed rather than removed: it protects against the
+ * accident, not against the deliberate choice.
+ *
+ * Investment history is never removable from here regardless of the flag. Those
+ * snapshots feed the Investments page's charts, ROI and allocation — deleting
+ * them from the net worth register would damage a different feature the user is
+ * not looking at and did not agree to change.
+ */
+export async function deleteNetWorthAccount(
+  id: string,
+  db: Db = getDb(),
+  opts: { withHistory?: boolean } = {},
+): Promise<void> {
+  const investments = db.select().from(investmentSnapshots)
+    .where(eq(investmentSnapshots.accountId, id)).all();
+  if (investments.length > 0) {
+    throw opts.withHistory ? new InvestmentHistoryError(id) : new AccountHasHistoryError(id);
+  }
+
   const balances = db.select().from(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).all();
-  if (balances.length > 0) throw new AccountHasHistoryError(id);
-  const investments = db.select().from(investmentSnapshots).where(eq(investmentSnapshots.accountId, id)).all();
-  if (investments.length > 0) throw new AccountHasHistoryError(id);
+  if (balances.length > 0) {
+    if (!opts.withHistory) throw new AccountHasHistoryError(id);
+    db.delete(balanceSnapshots).where(eq(balanceSnapshots.accountId, id)).run();
+  }
+
   db.delete(accounts).where(eq(accounts.id, id)).run();
 }
