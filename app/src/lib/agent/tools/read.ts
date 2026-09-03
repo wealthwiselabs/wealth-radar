@@ -16,6 +16,11 @@ import {
 } from '@/lib/investments/allocation';
 import { purposeReturnBetween } from '@/lib/investments/series';
 import type { Purpose } from '@/lib/investments/purpose';
+import { loadNetWorthContext } from '@/lib/netWorth/read';
+import { isCountable, netWorthAt } from '@/lib/netWorth/rollup';
+import { staleAccounts } from '@/lib/netWorth/staleness';
+import { netWorthSide } from '@/lib/netWorth/side';
+import { valuationAt } from '@/lib/netWorth/valuation';
 import type { Tool } from './types';
 
 const NO_INVESTMENT_DATA = 'No investment data.';
@@ -447,6 +452,58 @@ export const listTransactionsTool: Tool = {
   },
 };
 
+export async function readNetWorth(db?: Parameters<typeof loadNetWorthContext>[0]) {
+  const ctx = await loadNetWorthContext(db);
+  const today = new Date().toISOString().slice(0, 10);
+  const totals = netWorthAt(ctx, today);
+  return {
+    net: totals.net,
+    assets: totals.assets,
+    liabilities: totals.liabilities,
+    missing: totals.missing,
+    // A row is listed exactly when it is counted: a closed account still counts
+    // through the end of its closing month (isCountable, rollup.ts) — the same
+    // rule the API route (route.ts) uses for the register. Filtering on status
+    // alone would make the assistant disagree with the page for up to a month
+    // after an item closes.
+    rows: ctx.accounts
+      .filter((a) => netWorthSide(a) !== 'excluded' && isCountable(a, today))
+      .map((a) => ({ name: a.name, side: netWorthSide(a), value: valuationAt(ctx, a.id, today) })),
+    stale: staleAccounts(ctx, today).map((s) => ({ name: s.name, lastAsOf: s.lastAsOf })),
+  };
+}
+
+export const netWorthTool: Tool = {
+  gate: 'none',
+  spec: {
+    name: 'net_worth',
+    description:
+      'Report current net worth: total assets, total liabilities, the net figure, every tracked ' +
+      'item with its value, which items have no value recorded yet, and which are past their ' +
+      'review date. Values carry forward from each item\'s most recent reading.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  async run(_input, { db }) {
+    const out = await readNetWorth(db);
+    const lines: string[] = [];
+    lines.push(`Net worth: ${money(out.net)} (assets ${money(out.assets)}, liabilities ${money(out.liabilities)})`);
+    if (out.missing.length) {
+      lines.push(`Excluded (no value recorded): ${out.missing.join(', ')}`);
+    }
+    lines.push('Items:');
+    for (const r of out.rows) {
+      lines.push(`  ${r.name} [${r.side}]: ${r.value === null ? 'unknown' : money(r.value)}`);
+    }
+    if (out.stale.length) {
+      lines.push('Past their review date:');
+      for (const s of out.stale) {
+        lines.push(`  ${s.name} (last valued ${s.lastAsOf ?? 'never'})`);
+      }
+    }
+    return { content: lines.join('\n') };
+  },
+};
+
 export const readTools: Tool[] = [
   searchTransactionsTool,
   querySpendingTool,
@@ -458,4 +515,5 @@ export const readTools: Tool[] = [
   getAllocationBreakdownTool,
   getPortfolioTrendTool,
   listTransactionsTool,
+  netWorthTool,
 ];

@@ -14,6 +14,7 @@ const NAV = [
   { href: '/', label: 'Home' },
   { href: '/investments', label: 'Investments' },
   { href: '/investments/reserve', label: 'Reserve' },
+  { href: '/net-worth', label: 'Net worth' },
   { href: '/accounts', label: 'Accounts' },
   { href: '/rules', label: 'Rules' },
 ];

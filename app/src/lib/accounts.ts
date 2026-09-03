@@ -83,6 +83,10 @@ export async function createManualAccount(
     plaidAccountId: null,
     closedAtMonth: null,
     status: 'active',
+    reviewIntervalMonths: null,
+    securedByAccountId: null,
+    valuationProvider: null,
+    valuationRef: null,
     createdAt: now,
     modifiedAt: now,
   };
@@ -166,6 +170,15 @@ export async function resolveOrCreateAccount(input: ResolveAccountInput, db: Db 
     plaidAccountId: input.plaidAccountId ?? null,
     closedAtMonth: null,
     status: 'active',
+    // A Plaid-fed account is synced automatically, so a stale reading is
+    // impossible by construction — it must never surface in staleAccounts's
+    // "needs a look" list. A manual/PDF account has no cadence assigned at
+    // creation either, so both origins land on null here today; only the
+    // Plaid case is a hard invariant.
+    reviewIntervalMonths: null,
+    securedByAccountId: null,
+    valuationProvider: null,
+    valuationRef: null,
     createdAt: now,
     modifiedAt: now,
   };

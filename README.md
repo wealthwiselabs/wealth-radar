@@ -1,6 +1,6 @@
 # Wealthwise
 
-A self-hosted personal finance app to help you track and hopefully reduce your spending, build buffer for unexpected needs with emergency fund, and accumulate wealth through diversified investments. Import bank & brokerage statement PDFs and/or connect accounts via [Plaid](https://plaid.com); Claude classifies each transaction into a category/subcategory. Track spending, account coverage, and investment allocation over time. AI also assists to set rules to classify your expenses. **All data stays on your own machine** in a local SQLite file — nothing is sent to a third party except the transaction text you ask Claude to classify and (optionally) Plaid.
+A self-hosted personal finance app to help you track and hopefully reduce your spending, build buffer for unexpected needs with emergency fund, and accumulate wealth through diversified investments. Import bank & brokerage statement PDFs and/or connect accounts via [Plaid](https://plaid.com); Claude classifies each transaction into a category/subcategory. Track spending, account coverage, and investment allocation over time. AI also assists to set rules to classify your expenses. **All data stays on your own machine** in a local SQLite file — nothing is sent to a third party except the transaction text you ask Claude to classify, (optionally) Plaid, and (optionally) RentCast, which receives a property's address if you opt it in to automated valuation.
 
 > Single-tenant and local-first: one household shares one database and one login — there are
 > no separate per-user accounts. Locally it runs with no login by default; for any
@@ -107,6 +107,7 @@ Anthropic key is optional.
 | `PLAID_SECRET_SANDBOX` / `PLAID_SECRET_PRODUCTION` | Per-environment Plaid secret (`PLAID_SECRET` is a single-secret fallback).                                                                                     |
 | `PLAID_COUNTRY_CODES`                              | Defaults to`US`.                                                                                                                                               |
 | `APP_ENCRYPTION_KEY`                               | **Required if Plaid is used.** Base64 32-byte key that encrypts stored Plaid access tokens. Generate with the command below.                                   |
+| `RENTCAST_API_KEY`                                 | Optional. Enables automated property value estimates via [RentCast](https://www.rentcast.io/) (free tier: 50 requests/month). Leaving it unset disables the feature entirely — properties stay manually valued.  |
 | `AUTH_USERNAME` / `AUTH_PASSWORD`                  | Shared login gate. Setting`AUTH_PASSWORD` turns it on; in a production build it **fails closed** (refuses to serve) until you do. `AUTH_USERNAME` is optional. |
 | `AUTH_SECRET`                                      | Signs the session cookie; falls back to`AUTH_PASSWORD` if unset.                                                                                               |
 

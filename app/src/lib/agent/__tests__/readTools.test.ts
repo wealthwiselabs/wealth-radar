@@ -84,6 +84,7 @@ describe('readTools', () => {
       'investment_summary',
       'list_investment_transactions',
       'list_transactions',
+      'net_worth',
       'query_investment_returns',
       'query_reserve',
       'query_spending',
