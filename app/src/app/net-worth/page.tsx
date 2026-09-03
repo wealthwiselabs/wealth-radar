@@ -19,6 +19,8 @@ export interface RegisterRow {
   name: string;
   side: 'asset' | 'liability';
   group: string;
+  /** Waterfall bucket for liabilities (e.g. 'Credit cards'); null for assets. */
+  debtGroup: string | null;
   value: number | null;
   lastAsOf: string | null;
   source: string | null;
@@ -110,12 +112,34 @@ export default function NetWorthPage() {
         </div>
       ) : totals ? (
         <div className="space-y-[var(--space-6)]">
-          <div>
+          <div className="origin-card-elevated p-[var(--space-6)]">
             <p className="text-small text-[var(--color-text-base-subdued)]">Net worth</p>
-            <p className="heading-large text-[var(--color-text-base-default)]">{formatSignedCurrency(totals.net)}</p>
-            <p className="text-xsmall text-[var(--color-text-base-subdued)]">
-              {formatCurrency(totals.assets)} in assets, {formatCurrency(totals.liabilities)} in debt
+            <p className="heading-large text-[var(--color-text-base-default)] tabular-nums">
+              {formatSignedCurrency(totals.net)}
             </p>
+
+            <div className="mt-[var(--space-5)] flex flex-wrap gap-[var(--space-6)]">
+              <div>
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Assets</p>
+                <p className="heading-xsmall text-[var(--color-text-base-default)] tabular-nums">
+                  {formatCurrency(totals.assets)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xsmall text-[var(--color-text-base-subdued)]">Liabilities</p>
+                <p className="heading-xsmall text-[var(--color-text-base-default)] tabular-nums">
+                  {formatCurrency(totals.liabilities)}
+                </p>
+              </div>
+              {totals.assets > 0 && (
+                <div>
+                  <p className="text-xsmall text-[var(--color-text-base-subdued)]">Debt to assets</p>
+                  <p className="heading-xsmall text-[var(--color-text-base-default)] tabular-nums">
+                    {Math.round((totals.liabilities / totals.assets) * 100)}%
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {totals.missing.length > 0 && (

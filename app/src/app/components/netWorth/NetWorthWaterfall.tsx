@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { CHART_PALETTE, CHART_DANGER, CHART_INK, formatSignedCurrency } from '@/lib/chartConfig';
+import { DEBT_GROUPS } from '@/lib/netWorth/catalog';
 import type { RegisterRow } from '@/app/net-worth/page';
 
 export interface WaterfallStep {
@@ -41,14 +42,21 @@ export function buildWaterfall(rows: RegisterRow[]): WaterfallStep[] {
     steps.push({ label, delta: total, runningAfter: running, kind: 'asset' });
   }
 
-  const debts = rows
-    .filter((r) => r.side === 'liability' && r.value !== null)
-    .sort((a, b) => (b.value as number) - (a.value as number));
+  // Grouped, not listed per account. Account names here are bank product names
+  // ("Sapphire", "Everyday") that mean nothing on a chart, and assets a few
+  // lines above are already grouped — listing debt individually made the two
+  // halves of one visual disagree about what a step represents.
+  const debts = rows.filter((r) => r.side === 'liability' && r.value !== null);
 
-  for (const r of debts) {
-    const amount = r.value as number;
-    running -= amount;
-    steps.push({ label: r.name, delta: -amount, runningAfter: running, kind: 'liability' });
+  for (const bucket of DEBT_GROUPS) {
+    // A missing debtGroup falls to 'Other debt' rather than being skipped: a
+    // dropped liability would leave the waterfall's total disagreeing with the
+    // headline, with nothing on screen to explain the gap.
+    const inBucket = debts.filter((r) => (r.debtGroup ?? 'Other debt') === bucket);
+    if (inBucket.length === 0) continue;
+    const total = inBucket.reduce((sum, r) => sum + (r.value as number), 0);
+    running -= total;
+    steps.push({ label: bucket, delta: -total, runningAfter: running, kind: 'liability' });
   }
 
   steps.push({ label: 'Net worth', delta: running, runningAfter: running, kind: 'total' });

@@ -54,13 +54,48 @@ export default function NetWorthChart({ from, to, basis, refreshKey }: Props) {
         data: points.map((p) => -p.liabilities),
         backgroundColor: CHART_DANGER, borderWidth: 0,
       },
-      {
-        type: 'line' as const, label: 'Net worth',
-        data: points.map((p) => p.net),
-        borderColor: CHART_INK, backgroundColor: CHART_INK,
-        borderWidth: 2, tension: 0.2, pointRadius: 3, order: 0,
-      },
     ],
+  }), [points]);
+
+  // The net worth line lives on its own chart, not layered over the bars.
+  // Sharing one y-axis with gross assets and debt compressed it into a nearly
+  // flat band — a swing of a hundred thousand is invisible against a scale that
+  // has to span -$1M to +$2.5M. On its own scale it uses the full height, so
+  // the trend is actually readable. Both charts come from ONE fetch and one
+  // labels array, so their x-axes stay aligned by construction.
+  const trendData: ChartData<'line'> = useMemo(() => ({
+    labels: points.map((p) => p.label),
+    datasets: [{
+      label: 'Net worth',
+      data: points.map((p) => p.net),
+      borderColor: CHART_INK, backgroundColor: CHART_INK,
+      borderWidth: 2, tension: 0.2, pointRadius: 3,
+    }],
+  }), [points]);
+
+  const trendOptions: ChartOptions<'line'> = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    scales: {
+      x: { grid: { display: false } },
+      // Deliberately NOT beginAtZero: this chart's job is the shape of the
+      // change, and anchoring to zero would flatten it right back out. The
+      // composition chart below is where absolute magnitude is read.
+      y: { ticks: { callback: (v) => formatSignedCurrency(Number(v)) } },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (c) => formatSignedCurrency(Number(c.parsed.y)),
+          afterBody: (items) => {
+            const p = points[items[0].dataIndex];
+            return p?.missing.length ? [`Excludes ${p.missing.length} unvalued item(s)`] : [];
+          },
+        },
+      },
+    },
   }), [points]);
 
   const options: ChartOptions<'bar' | 'line'> = useMemo(() => ({
@@ -111,10 +146,24 @@ export default function NetWorthChart({ from, to, basis, refreshKey }: Props) {
   }
 
   return (
-    <div className="origin-card-elevated p-[var(--space-6)]">
-      <h2 className="heading-xsmall text-[var(--color-text-base-default)] mb-[var(--space-3)]">Net worth over time</h2>
-      <div style={{ height: 320 }}>
-        <Chart type="bar" data={data} options={options} />
+    <div className="space-y-[var(--space-6)]">
+      <div className="origin-card-elevated p-[var(--space-6)]">
+        <h2 className="heading-xsmall text-[var(--color-text-base-default)] mb-[var(--space-3)]">
+          Net worth over time
+        </h2>
+        <div style={{ height: 260 }}>
+          <Chart type="line" data={trendData} options={trendOptions} />
+        </div>
+      </div>
+
+      <div className="origin-card-elevated p-[var(--space-6)]">
+        <h2 className="heading-xsmall text-[var(--color-text-base-default)]">What it&apos;s made of</h2>
+        <p className="text-xsmall text-[var(--color-text-base-subdued)] mb-[var(--space-3)]">
+          Assets above the line, debt below. Same months as the trend above.
+        </p>
+        <div style={{ height: 300 }}>
+          <Chart type="bar" data={data} options={options} />
+        </div>
       </div>
     </div>
   );

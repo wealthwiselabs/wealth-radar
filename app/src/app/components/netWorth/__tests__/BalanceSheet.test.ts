@@ -11,7 +11,8 @@ import type { RegisterRow } from '@/app/net-worth/page';
 const row = (over: Partial<RegisterRow>): RegisterRow => ({
   accountId: 'a1', name: 'Home', side: 'asset', group: 'property', value: 1_150_000,
   lastAsOf: '2026-08-01', source: 'manual', reviewIntervalMonths: 12,
-  securedByAccountId: null, valueLow: null, valueHigh: null, valuationRef: null, canDelete: false, ...over,
+  securedByAccountId: null, valueLow: null, valueHigh: null, valuationRef: null,
+  debtGroup: null, canDelete: false, ...over,
 });
 
 const html = (rows: RegisterRow[]) =>

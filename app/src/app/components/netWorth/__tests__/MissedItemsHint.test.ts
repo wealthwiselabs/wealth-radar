@@ -9,7 +9,7 @@ import type { RegisterRow } from '@/app/net-worth/page';
 const row = (name: string): RegisterRow => ({
   accountId: name, name, side: 'asset', group: 'other', value: 1, lastAsOf: '2026-08-01',
   source: 'manual', reviewIntervalMonths: null, securedByAccountId: null,
-  valueLow: null, valueHigh: null, valuationRef: null, canDelete: false,
+  valueLow: null, valueHigh: null, valuationRef: null, debtGroup: null, canDelete: false,
 });
 
 describe('missedItems', () => {

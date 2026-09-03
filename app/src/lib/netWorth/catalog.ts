@@ -91,6 +91,77 @@ export function catalogByKey(key: string): CatalogItem | undefined {
  * the catalog never issued, so this must always return something. Anything with
  * 'credit' or 'loan' in it is debt; anything else unrecognised falls to 'other'.
  */
+/**
+ * The buckets a liability can occupy in the waterfall, in display order.
+ *
+ * Assets there are grouped by category, so liabilities must be too — listing
+ * them by account name puts bank product names ("Sapphire", "Everyday") on a
+ * chart where they mean nothing to the reader. The register still lists
+ * individual accounts; that is where you manage them.
+ */
+export const DEBT_GROUPS = [
+  'Mortgage', 'HELOC', 'Credit cards', 'Auto loans', 'Student loans', 'Other debt',
+] as const;
+
+export type DebtGroup = (typeof DEBT_GROUPS)[number];
+
+/** Exact catalog subtypes → bucket. Anything absent falls through to matching. */
+const DEBT_BY_SUBTYPE: Record<string, DebtGroup> = {
+  mortgage: 'Mortgage',
+  heloc: 'HELOC',
+  credit: 'Credit cards',
+  auto: 'Auto loans',
+  student: 'Student loans',
+  personal: 'Other debt',
+  retirement_loan: 'Other debt',
+  policy_loan: 'Other debt',
+  medical: 'Other debt',
+  tax: 'Other debt',
+  other_debt: 'Other debt',
+};
+
+/**
+ * Display bucket for a liability's subtype.
+ *
+ * ALWAYS returns a bucket. Plaid accounts predate this catalog and carry
+ * subtypes it never issued ("credit card", "home equity line of credit"), and
+ * a null here would silently drop real debt out of the waterfall — the total
+ * would stop reconciling with the register and nothing would say why. So the
+ * fallback matches loosely, and anything still unrecognised becomes Other debt.
+ */
+/**
+ * Display bucket for a liability, from its subtype AND its type.
+ *
+ * Both are needed, for the same reason `netWorthSide` needs both: a manually
+ * created item carries a catalog subtype ('auto', 'mortgage'), but a Plaid
+ * account carries NO subtype at all and is identified by its type ('credit',
+ * 'loan'). Reading subtype alone put every real credit card into "Other debt".
+ *
+ * Subtype wins when present — it is the more specific signal. An auto loan has
+ * type 'loan', and falling back to the type would lose that distinction.
+ */
+export function debtGroupFor(account: { type: string; subtype: string | null }): DebtGroup {
+  const bySubtype = account.subtype ? debtGroupForSubtype(account.subtype) : null;
+  if (bySubtype && bySubtype !== 'Other debt') return bySubtype;
+  const byType = debtGroupForSubtype(account.type ?? '');
+  // Only take the type's answer if it is more specific than what subtype gave.
+  return byType !== 'Other debt' ? byType : (bySubtype ?? 'Other debt');
+}
+
+export function debtGroupForSubtype(subtype: string): DebtGroup {
+  const exact = DEBT_BY_SUBTYPE[subtype];
+  if (exact) return exact;
+  const s = subtype.toLowerCase();
+  // Order matters: 'home equity line of credit' contains 'credit', so HELOC
+  // must be tested before the card match or it would bucket as a credit card.
+  if (s.includes('heloc') || s.includes('home equity')) return 'HELOC';
+  if (s.includes('mortgage')) return 'Mortgage';
+  if (s.includes('auto') || s.includes('vehicle') || s.includes('car loan')) return 'Auto loans';
+  if (s.includes('student')) return 'Student loans';
+  if (s.includes('credit') || s.includes('card')) return 'Credit cards';
+  return 'Other debt';
+}
+
 export function groupForSubtype(subtype: string): CatalogGroup {
   const exact = CATALOG.find((c) => c.subtype === subtype);
   if (exact) return exact.group;

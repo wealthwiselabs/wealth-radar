@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { CATALOG, catalogByKey, groupForSubtype, ASSET_GROUPS } from '@/lib/netWorth/catalog';
+import {
+  CATALOG, catalogByKey, groupForSubtype, debtGroupForSubtype, debtGroupFor,
+  ASSET_GROUPS, DEBT_GROUPS,
+} from '@/lib/netWorth/catalog';
 
 describe('catalog', () => {
   it('has unique keys', () => {
@@ -60,5 +63,55 @@ describe('catalog', () => {
   it('resolves an other-liability subtype to debt, not to an asset group', () => {
     expect(groupForSubtype('other_debt')).toBe('debt');
     expect(groupForSubtype('other')).toBe('other');
+  });
+});
+
+describe('debtGroupFor', () => {
+  it('buckets a Plaid card by its TYPE when subtype is null', () => {
+    // Plaid accounts carry no subtype — a card is identified by type 'credit',
+    // exactly as netWorthSide already has to handle. Reading subtype alone put
+    // every real credit card into "Other debt".
+    expect(debtGroupFor({ type: 'credit', subtype: null })).toBe('Credit cards');
+    expect(debtGroupFor({ type: 'loan', subtype: null })).toBe('Other debt');
+  });
+
+  it('prefers subtype over type when both are present', () => {
+    // The catalog's subtype is the more specific signal: an auto loan has
+    // type 'loan', and bucketing it as generic debt would lose that.
+    expect(debtGroupFor({ type: 'loan', subtype: 'auto' })).toBe('Auto loans');
+    expect(debtGroupFor({ type: 'loan', subtype: 'mortgage' })).toBe('Mortgage');
+  });
+});
+
+describe('debtGroupForSubtype', () => {
+  it('buckets each catalog debt subtype into a display group', () => {
+    expect(debtGroupForSubtype('mortgage')).toBe('Mortgage');
+    expect(debtGroupForSubtype('heloc')).toBe('HELOC');
+    expect(debtGroupForSubtype('credit')).toBe('Credit cards');
+    expect(debtGroupForSubtype('auto')).toBe('Auto loans');
+    expect(debtGroupForSubtype('student')).toBe('Student loans');
+  });
+
+  it('folds the long tail into Other debt', () => {
+    for (const s of ['personal', 'retirement_loan', 'policy_loan', 'medical', 'tax', 'other_debt']) {
+      expect(debtGroupForSubtype(s)).toBe('Other debt');
+    }
+  });
+
+  it('never drops a liability, whatever its subtype', () => {
+    // Plaid accounts predate this catalog and carry subtypes it never issued.
+    // A bucket of null would silently remove real debt from the waterfall.
+    expect(debtGroupForSubtype('credit card')).toBe('Credit cards');
+    expect(debtGroupForSubtype('home equity line of credit')).toBe('HELOC');
+    expect(debtGroupForSubtype('')).toBe('Other debt');
+    expect(debtGroupForSubtype('nonsense')).toBe('Other debt');
+  });
+
+  it('covers every debt entry the catalog defines', () => {
+    // A new debt entry with no bucket would land in Other debt silently; this
+    // fails loudly instead, so the mapping is reviewed alongside the catalog.
+    for (const item of CATALOG.filter((c) => c.side === 'liability')) {
+      expect(DEBT_GROUPS).toContain(debtGroupForSubtype(item.subtype));
+    }
   });
 });

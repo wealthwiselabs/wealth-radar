@@ -5,7 +5,7 @@ import { loadNetWorthContext } from '@/lib/netWorth/read';
 import { isCountable, netWorthAt } from '@/lib/netWorth/rollup';
 import { valuationAt } from '@/lib/netWorth/valuation';
 import { netWorthSide } from '@/lib/netWorth/side';
-import { groupForSubtype } from '@/lib/netWorth/catalog';
+import { groupForSubtype, debtGroupFor } from '@/lib/netWorth/catalog';
 import { getValuationProvider } from '@/lib/netWorth/providers';
 
 // GET /api/net-worth — current totals plus one row per item for the register.
@@ -41,6 +41,11 @@ export async function GET(_request: Request) {
           name: a.name,
           side: netWorthSide(a),
           group: groupForSubtype(a.subtype ?? ''),
+          // Finer bucket for the waterfall, which groups debt the way it groups
+          // assets. Null on the asset side, where `group` already suffices.
+          debtGroup: netWorthSide(a) === 'liability'
+            ? debtGroupFor({ type: a.type, subtype: a.subtype })
+            : null,
           value: valuationAt(ctx, a.id, today),
           lastAsOf: latest?.asOf ?? null,
           source: latest?.source ?? null,
