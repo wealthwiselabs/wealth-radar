@@ -10,21 +10,35 @@ type Db = ReturnType<typeof getDb>;
 const AUTO_SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Staleness threshold for the on-boot sync, deliberately well under the 24h
+ * cadence of the daily wake that drives it.
+ *
+ * The wake (GitHub Actions `daily-refresh`) fires at a FIXED time each day, but
+ * a sync records `lastSyncedAt` at its *completion* — a little after that wake
+ * (boot + the sync itself take time). A 24h threshold therefore makes the next
+ * day's wake compute "just under 24h elapsed" and skip, so the sync only runs
+ * every other day (worse with GitHub's cron jitter). 12h clears a once-daily
+ * wake with wide margin while still skipping a redundant boot minutes after a
+ * manual sync.
+ */
+const STARTUP_SYNC_STALENESS_HOURS = 12;
+
+/**
  * Should the app sync at startup? Yes when it has never synced, or when the
  * newest sync is at least `thresholdHours` old. The boundary (exactly the
  * threshold) counts as due — a run landing precisely on the cadence should
  * sync, not skip.
  *
- * The default is 24h (daily). The app scales to zero on Fly, so this on-boot
- * check — not the in-process interval — is what actually keeps data fresh: a
- * daily external ping (GitHub Actions `daily-refresh`, or the Mac backup's
- * `fly machine start`) cold-starts the process, and this fires the sync when a
- * day has passed.
+ * The default is `STARTUP_SYNC_STALENESS_HOURS`. The app scales to zero on Fly,
+ * so this on-boot check — not the in-process interval — is what actually keeps
+ * data fresh: a daily external ping (GitHub Actions `daily-refresh`, or the Mac
+ * backup's `fly machine start`) cold-starts the process, and this fires the
+ * sync when the threshold has passed.
  */
 export function shouldSyncOnStartup(
   lastSyncedAt: string | null,
   now: Date,
-  thresholdHours = 24,
+  thresholdHours = STARTUP_SYNC_STALENESS_HOURS,
 ): boolean {
   if (!lastSyncedAt) return true;
   const elapsed = now.getTime() - new Date(lastSyncedAt).getTime();

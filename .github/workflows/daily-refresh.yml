@@ -4,7 +4,9 @@ name: Daily refresh
 # opened it. The app scales to zero on Fly (auto_stop_machines = "stop"), so the
 # in-process 24h timer almost never gets to fire. Instead, a scheduled HTTP hit
 # cold-starts the machine; instrumentation.ts runs on process boot and triggers
-# the sync when data is >= 24h stale (see shouldSyncOnStartup). A single ping is
+# the sync when data is >= 12h stale (see shouldSyncOnStartup — the threshold is
+# kept under the 24h wake cadence so a fixed-time daily ping reliably clears it).
+# A single ping is
 # all we need — we rely on the cold start, not on any authenticated endpoint, so
 # no app credentials live here.
 
