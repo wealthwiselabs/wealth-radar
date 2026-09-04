@@ -10,14 +10,24 @@ describe('shouldSyncOnStartup', () => {
   it('syncs when nothing has ever synced', () => {
     expect(shouldSyncOnStartup(null, NOW)).toBe(true);
   });
-  it('skips when the last sync is under 24h old', () => {
-    expect(shouldSyncOnStartup('2026-08-09T13:00:00.000Z', NOW)).toBe(false); // 23h
+  it('skips a redundant boot minutes after a recent sync', () => {
+    expect(shouldSyncOnStartup('2026-08-10T10:00:00.000Z', NOW)).toBe(false); // 2h
   });
   it('syncs when the last sync is over 24h old', () => {
     expect(shouldSyncOnStartup('2026-08-09T11:00:00.000Z', NOW)).toBe(true); // 25h
   });
-  it('treats exactly 24h as due (boundary belongs to sync)', () => {
-    expect(shouldSyncOnStartup('2026-08-09T12:00:00.000Z', NOW)).toBe(true);
+  it('treats the default threshold boundary as due (boundary belongs to sync)', () => {
+    expect(shouldSyncOnStartup('2026-08-10T00:00:00.000Z', NOW)).toBe(true); // 12h
+  });
+  it('still syncs on the daily wake when the prior run finished just under 24h ago', () => {
+    // The daily cron fires at a fixed time, but a sync's lastSyncedAt lands a few
+    // minutes AFTER that wake (boot + sync take time). The next day's wake is
+    // therefore slightly under 24h later. A 24h threshold would skip it and the
+    // sync would only run every other day — so the effective threshold must sit
+    // well under the daily cadence.
+    const now = new Date('2026-08-10T09:17:30.000Z');
+    const priorCompletion = '2026-08-09T09:20:00.000Z'; // 23h57m30s earlier
+    expect(shouldSyncOnStartup(priorCompletion, now)).toBe(true);
   });
   it('honors a custom threshold', () => {
     expect(shouldSyncOnStartup('2026-08-10T10:00:00.000Z', NOW, 1)).toBe(true); // 2h > 1h
