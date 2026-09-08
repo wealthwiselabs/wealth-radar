@@ -165,14 +165,35 @@ export function allocationPeriod(basis: AllocationBasis, year: number, index: nu
   };
 }
 
-export function enumerateAllocationPeriods(from: string, to: string, basis: AllocationBasis): AllocationPeriod[] {
+/**
+ * The calendar periods of `basis` that fall inside [from, to].
+ *
+ * By default a period counts only once it has ENDED by `to`, which is what a
+ * bounded historical window wants. Callers that pass `to = today` are asking a
+ * different question: they want the period in progress right now, and dropping
+ * it means the current month never reaches a chart until the month is over.
+ * `includeInProgress` adds exactly that one period — the one that has started
+ * but not finished — with its `endDate` clamped to `to`.
+ *
+ * Clamping rather than emitting the period's true end matters downstream: the
+ * close boundary is resolved against real snapshots within a tolerance, and a
+ * September period ending 2026-09-30 cannot resolve one on 2026-09-06. Clamped,
+ * the period closes on a date that has data, and its return reads honestly as
+ * period-to-date. A period that has not started by `to` is never included.
+ */
+export function enumerateAllocationPeriods(
+  from: string, to: string, basis: AllocationBasis, includeInProgress = false,
+): AllocationPeriod[] {
   const out: AllocationPeriod[] = [];
   const y0 = Number(from.slice(0, 4)), y1 = Number(to.slice(0, 4));
   for (let y = y0; y <= y1; y++) {
     const idxs = basis === 'monthly' ? [1,2,3,4,5,6,7,8,9,10,11,12] : basis === 'quarterly' ? [1,2,3,4] : [0];
     for (const i of idxs) {
       const p = allocationPeriod(basis, y, i);
-      if (p.endDate >= from && p.endDate <= to) out.push(p);
+      if (p.endDate >= from && p.endDate <= to) { out.push(p); continue; }
+      if (includeInProgress && p.startDate >= from && p.startDate <= to && p.endDate > to) {
+        out.push({ ...p, endDate: to });
+      }
     }
   }
   return out;

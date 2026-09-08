@@ -383,11 +383,11 @@ describe('classExchangeFlows (look-through)', () => {
       ['sMM', t({ assetType: 'money_market' })],
     ]));
     ctx.exchanges = [
-      { accountId: 'a1', securityId: 'sVTI', date: '2026-03-01', amount: 1000, type: 'buy', name: 'YOU BOUGHT VTI' },
-      { accountId: 'a1', securityId: 'sVTI', date: '2026-03-05', amount: 5, type: 'buy', name: 'REINVESTMENT VTI' }, // excluded
-      { accountId: 'a1', securityId: 'sMM', date: '2026-03-01', amount: -1000, type: 'sell', name: 'YOU SOLD SPAXX' },
-      { accountId: 'a1', securityId: 'sVTI', date: '2025-01-01', amount: 50, type: 'buy', name: 'YOU BOUGHT VTI' }, // out of window
-      { accountId: 'a2', securityId: 'sVTI', date: '2026-03-01', amount: 999, type: 'buy', name: 'YOU BOUGHT VTI' }, // other acct
+      { id: 'x1', subtype: '', accountId: 'a1', securityId: 'sVTI', date: '2026-03-01', amount: 1000, type: 'buy', name: 'YOU BOUGHT VTI' },
+      { id: 'x2', subtype: '', accountId: 'a1', securityId: 'sVTI', date: '2026-03-05', amount: 5, type: 'buy', name: 'REINVESTMENT VTI' }, // excluded
+      { id: 'x3', subtype: '', accountId: 'a1', securityId: 'sMM', date: '2026-03-01', amount: -1000, type: 'sell', name: 'YOU SOLD SPAXX' },
+      { id: 'x4', subtype: '', accountId: 'a1', securityId: 'sVTI', date: '2025-01-01', amount: 50, type: 'buy', name: 'YOU BOUGHT VTI' }, // out of window
+      { id: 'x5', subtype: '', accountId: 'a2', securityId: 'sVTI', date: '2026-03-01', amount: 999, type: 'buy', name: 'YOU BOUGHT VTI' }, // other acct
     ];
     const flows = classExchangeFlows(ctx, 'a1', '2026-01-01', '2026-12-31');
     const byKey = flows.reduce((m, f) => ((m[f.pathKey] = (m[f.pathKey] ?? 0) + f.amount), m), {} as Record<string, number>);
@@ -411,9 +411,9 @@ describe('look-through ROI (exchanges as class flows)', () => {
     ];
     const ctx = rangeCtx(snaps, [], tags);
     ctx.exchanges = [
-      { accountId: 'a1', securityId: 'sMM', date: '2026-01-02', amount: 48, type: 'buy', name: 'PURCHASE INTO CORE ACCOUNT SPAXX' },
-      { accountId: 'a1', securityId: 'sMM', date: '2026-02-02', amount: -18, type: 'sell', name: 'YOU SOLD SPAXX' },
-      { accountId: 'a1', securityId: 'sEq', date: '2026-02-02', amount: 18, type: 'buy', name: 'YOU BOUGHT VTI' },
+      { id: 'x6', subtype: '', accountId: 'a1', securityId: 'sMM', date: '2026-01-02', amount: 48, type: 'buy', name: 'PURCHASE INTO CORE ACCOUNT SPAXX' },
+      { id: 'x7', subtype: '', accountId: 'a1', securityId: 'sMM', date: '2026-02-02', amount: -18, type: 'sell', name: 'YOU SOLD SPAXX' },
+      { id: 'x8', subtype: '', accountId: 'a1', securityId: 'sEq', date: '2026-02-02', amount: 18, type: 'buy', name: 'YOU BOUGHT VTI' },
     ];
     const tree = buildAllocationWindowTree(ctx, '2026-01-01', '2026-08-07');
     const mm = tree.children.find((c) => c.label === 'Money market')!;
@@ -435,7 +435,7 @@ describe('look-through ROI (exchanges as class flows)', () => {
     ];
     const ctx = rangeCtx(snaps, [], tags);
     ctx.exchanges = [
-      { accountId: 'a1', securityId: 'sCash', date: '2026-04-20', amount: 427, type: 'buy', name: 'PURCHASE INTO CORE ACCOUNT' },
+      { id: 'x9', subtype: '', accountId: 'a1', securityId: 'sCash', date: '2026-04-20', amount: 427, type: 'buy', name: 'PURCHASE INTO CORE ACCOUNT' },
     ];
     const tree = buildAllocationWindowTree(ctx, '2026-01-01', '2026-08-07');
     const cash = tree.children.find((c) => c.label === 'Cash')!;

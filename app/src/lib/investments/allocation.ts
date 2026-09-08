@@ -8,7 +8,7 @@ import {
   type Purpose, type PurposeOverride,
 } from '@/lib/investments/purpose';
 import type { SnapshotWithHoldings } from '@/lib/investments/snapshots';
-import type { FlowRow } from '@/lib/investments/transfers';
+import { netInterAccountTransfers, type FlowRow } from '@/lib/investments/transfers';
 
 export interface TagSet {
   assetType: string; region: string | null; cap: string | null; style: string | null; sector: string | null;
@@ -51,7 +51,12 @@ export function bucketPath(tags: TagSet): string[] {
 
 /** A raw investment transaction (buy/sell/cash) — the exchange/activity stream. */
 export interface ExchangeTxn {
+  id: string;
   accountId: string; securityId: string | null; date: string; amount: number; type: string; name: string;
+  // Plaid's transaction subtype. `type` alone cannot tell a rollover deposit
+  // from a dividend — both arrive as type 'cash' — so capital-movement
+  // detection needs this.
+  subtype: string;
 }
 export interface AllocContext {
   snapshots: SnapshotWithHoldings[];
@@ -389,41 +394,159 @@ function findByPath(tree: AllocNode, path: string[]): AllocNode | undefined {
  * contribution/withdrawal rows cannot — see the spec's Apr '25 case. An account
  * without exchanges in the window falls back to its dated external cash flows.
  */
+/**
+ * Cash rows that move capital across an account boundary, as opposed to rows
+ * recording return earned inside it.
+ *
+ * This is a CANDIDATE filter, not a verdict. It is deliberately loose because
+ * nothing downstream trusts it on its own: a row only ever matters once it has
+ * been matched against an equal and opposite row in another tracked account
+ * (see rootFlows). That matching is what separates a real transfer from a fund
+ * distribution, an internal journal or a cash sweep — all of which carry a
+ * deposit/withdrawal subtype and would otherwise have to be excluded by name,
+ * one broker wording at a time.
+ *
+ * `realizedGainLoss` is excluded even so: brokers emit it AS a
+ * deposit/withdrawal, it is an artifact of a sale rather than cash moving, and
+ * it shows up in offsetting pairs often enough to match one by coincidence.
+ */
+function isCapitalMovement(e: ExchangeTxn): boolean {
+  if (/realizedGainLoss/i.test(e.name)) return false;
+  return e.type === 'cash'
+    && (e.subtype === 'deposit' || e.subtype === 'withdrawal' || e.subtype === 'contribution');
+}
+
+/**
+ * Plaid signs cash rows from the account's cash balance — a deposit is negative
+ * (cash arriving), a withdrawal positive. Modified Dietz wants the opposite: a
+ * contribution is positive.
+ */
+const toFlowSign = (plaidAmount: number) => -plaidAmount;
+
+/** Both legs of one transfer rarely share a date; brokers post them a day or
+ * two apart. Same window the cross-account flow netting uses. */
+const SAME_MOVEMENT_DAYS = 5;
+
+function daysApart(a: string, b: string): number {
+  return Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86_400_000;
+}
+
+/**
+ * The root's flows: each account's own flows, plus the legs of inter-account
+ * transfers that no account's basis managed to record.
+ *
+ * The per-account basis is unchanged — per-account transaction-feed
+ * look-through where available, dated external cash-flow fallback otherwise.
+ * That basis is right about what entered each ACCOUNT and wrong about the
+ * household in exactly one way, which is all this function repairs:
+ *
+ * A rollover has two legs. The receiving account shows it — the arriving cash
+ * gets deployed, and those buys are visible to the look-through. The sending
+ * account is typically a 401k, whose feed carries no buy/sell at all, so its
+ * outgoing leg is worth nothing to the look-through and the external-cash-flow
+ * fallback has no row for it either. The household is then charged a
+ * contribution with no matching withdrawal, and Modified Dietz subtracts money
+ * that never arrived. In August 2026 that turned a $20.7k value increase into a
+ * $61.8k "loss" on the homepage chart.
+ *
+ * So: pair the cash transfer rows across accounts (`netInterAccountTransfers` —
+ * the same pairing the value series and the grid already apply), and for each
+ * matched pair add back the leg that is missing. "Missing" is checked against
+ * what that account's own basis already produced, because an account that did
+ * record its own side (a taxable account selling to fund the move) must not have
+ * it subtracted twice.
+ *
+ * Deliberately conservative: an UNMATCHED cash row is never added. A fund
+ * distribution, a share-class journal or a cash sweep has no counterpart in
+ * another tracked account, so it cannot reach the flow set and cannot invent a
+ * contribution that never happened.
+ */
 function rootFlows(
   ctx: AllocContext, accountBoundaries: Array<{ accountId: string; close: SnapshotWithHoldings }>,
   targets: readonly Purpose[], t0: string, t1: string,
 ): Flow[] {
-  const out: Flow[] = [];
+  const counted: FlowRow[] = [];
+  const legs: FlowRow[] = [];
+
   for (const { accountId, close } of accountBoundaries) {
     const accountPurpose = ctx.accountPurposes.get(accountId) ?? 'portfolio';
     const purposeOf = (securityId: string | null) => securityPurpose(ctx, accountId, securityId);
+
+    const targetHoldings = holdingsForPurpose(close, accountPurpose, ctx.overrides, targets);
+    const targetTotal = targetHoldings.reduce((s, h) => s + h.value, 0);
+    const closeTotal = close.holdings.reduce((s, h) => s + h.value, 0);
+    // Account-level movement can't be attributed to one security, so it is
+    // pro-rated by the target purposes' share of the close holdings — the same
+    // rule the external-cash-flow branch below uses.
+    const share = closeTotal > 0 ? targetTotal / closeTotal : 1;
+
+    for (const e of ctx.exchanges) {
+      if (e.accountId !== accountId || e.date < t0 || e.date > t1) continue;
+      if (!isCapitalMovement(e)) continue;
+      const amount = e.securityId
+        ? (targets.includes(purposeOf(e.securityId)) ? toFlowSign(e.amount) : null)
+        : toFlowSign(e.amount) * share;
+      // A zero-amount row (brokers emit "transferOut" placeholders) would match
+      // every other zero row and pair spuriously.
+      if (amount === null || amount === 0) continue;
+      legs.push({ id: e.id, accountId, date: e.date, amount, kind: 'transfer' });
+    }
 
     if (accountHasExchanges(ctx, accountId, t0, t1)) {
       for (const e of ctx.exchanges) {
         if (e.accountId !== accountId || e.date < t0 || e.date > t1) continue;
         if ((e.type !== 'buy' && e.type !== 'sell') || !e.securityId || isReinvestment(e.name)) continue;
         if (!targets.includes(purposeOf(e.securityId))) continue;
-        out.push({ date: e.date, amount: e.amount });
+        counted.push({ id: e.id, accountId, date: e.date, amount: e.amount, kind: 'exchange' });
       }
       continue;
     }
 
-    const targetHoldings = holdingsForPurpose(close, accountPurpose, ctx.overrides, targets);
-    const targetTotal = targetHoldings.reduce((s, h) => s + h.value, 0);
-    const closeTotal = close.holdings.reduce((s, h) => s + h.value, 0);
     for (const f of ctx.flows) {
       if (f.accountId !== accountId || f.date < t0 || f.date > t1) continue;
       if (f.securityId) {
-        if (targets.includes(purposeOf(f.securityId))) out.push({ date: f.date, amount: f.amount });
+        if (targets.includes(purposeOf(f.securityId))) {
+          counted.push({ id: f.id, accountId, date: f.date, amount: f.amount, kind: f.kind });
+        }
         continue;
       }
       // Account-level flow: whole for a single-purpose account, pro-rated by the
       // target's share of the close holdings for a mixed one.
-      const share = closeTotal > 0 ? targetTotal / closeTotal : 1;
-      out.push({ date: f.date, amount: f.amount * share });
+      counted.push({ id: f.id, accountId, date: f.date, amount: f.amount * share, kind: f.kind });
     }
   }
-  return out;
+
+  // What netting REMOVED is an inter-account transfer: an equal and opposite
+  // pair, in two different tracked accounts, a few days apart.
+  //
+  // Add back only the leg its own account failed to record. "Recorded" is judged
+  // by DIRECTION, not by amount: the receiving account books one arriving
+  // rollover as several buys (park the cash, then redeploy it), so no single
+  // counted flow equals the leg — but a same-signed flow around the same date is
+  // that transfer, and adding the leg on top would double it. Matching on amount
+  // instead let both legs of a pair through, and they simply cancelled: the
+  // household total never moved and August 2026 stayed broken.
+  //
+  // Same-sign-nearby is also what keeps the sender honest in the other
+  // direction. A taxable account that sells to fund a move books its own -X, so
+  // its leg is skipped; a 401k, which books nothing at all, gets its leg added.
+  const unpaired = new Set(netInterAccountTransfers(legs, SAME_MOVEMENT_DAYS).map((f) => f.id));
+  // Tested against the basis as it stands BEFORE any leg is added. Testing
+  // against a list being appended to would let the first added leg mask the
+  // rest: a rollover split across two funds arrives as two legs on one day, and
+  // only the first would survive — which is precisely half of the August 2026
+  // correction going missing.
+  const recorded = [...counted];
+  for (const leg of legs) {
+    if (unpaired.has(leg.id)) continue;
+    const alreadyRecorded = recorded.some((f) =>
+      f.accountId === leg.accountId
+      && Math.sign(f.amount) === Math.sign(leg.amount)
+      && daysApart(f.date, leg.date) <= SAME_MOVEMENT_DAYS);
+    if (!alreadyRecorded) counted.push(leg);
+  }
+
+  return counted.map((f) => ({ date: f.date, amount: f.amount }));
 }
 
 export function buildAllocationTree(
@@ -855,7 +978,12 @@ export function nodeTrendSeries(
   ctx: AllocContext, path: string[], basis: AllocationBasis, from: string, to: string,
   targets: readonly Purpose[] = ['portfolio'],
 ): AllocTrendPoint[] {
-  return enumerateAllocationPeriods(from, to, basis).map((period) => {
+  // includeInProgress: every caller of this function already filters the result
+  // to `startDate <= today`, i.e. they all want the period running right now and
+  // only want future ones gone. Without it the current month is missing from the
+  // series entirely whenever `to` is today (the open-ended "All time" range),
+  // and the line just stops at last month.
+  return enumerateAllocationPeriods(from, to, basis, true).map((period) => {
     const root = buildAllocationTree(ctx, period, targets);
     const node = findByPath(root, path);
     // VALUE is carry-forward so every line is continuous from its first snapshot
