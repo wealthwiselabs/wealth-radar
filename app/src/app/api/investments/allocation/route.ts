@@ -14,7 +14,13 @@ export async function GET(request: NextRequest) {
     const ctx = await loadAllocationContext();
     const earliest = ctx.snapshots.length ? ctx.snapshots.map((s) => s.asOf).sort()[0] : null;
     const today = new Date().toISOString().slice(0, 10);
-    const periods = earliest ? enumerateAllocationPeriods(earliest, today, basis) : [];
+    // includeInProgress: `to` is today, which lands mid-period, and without it
+    // the period running right now is never enumerated — so it is absent from
+    // the picker and unreachable, leaving the page showing the last COMPLETED
+    // period (up to three months stale on a quarterly basis). The in-progress
+    // period comes back clamped to today, so it closes on a snapshot that
+    // exists and reads as period-to-date.
+    const periods = earliest ? enumerateAllocationPeriods(earliest, today, basis, true) : [];
     const requested = periods.find((p) => p.key === q.get('period'));
     // No explicit (matching) period param: default to the latest period that
     // actually has data, not the latest calendar period — the newest period is

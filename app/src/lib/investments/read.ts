@@ -109,7 +109,9 @@ export async function loadAllocationContext(db: Db = getDb()): Promise<AllocCont
     }]),
   );
   const exchanges = db.select().from(schema.investmentTransactions).all().map((t) => ({
+    id: t.id,
     accountId: t.accountId, securityId: t.securityId ?? null, date: t.date, amount: t.amount, type: t.type, name: t.name,
+    subtype: t.subtype ?? '',
   }));
   const accountLabels = new Map<string, string>(
     db.select().from(schema.accounts).all()

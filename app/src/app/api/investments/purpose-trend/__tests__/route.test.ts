@@ -212,5 +212,21 @@ describe('purpose-trend route', () => {
         expect(keys).not.toContain(`monthly:2026-${m}`);
       }
     });
+
+    // The homepage's default range is "All time", which sends empty from/to, so
+    // the route resolves `to` to TODAY rather than to a month end. That lands
+    // mid-period, and the period enumeration used to require a period to have
+    // ENDED by `to` — so the current month vanished and the chart's return line
+    // just stopped at last month. The test above cannot catch it: its `to` of
+    // 2026-12-31 is past August's end, so August survived either way.
+    it('includes the current month when `to` is omitted and resolves to today', async () => {
+      seedReserve();
+      const res = await GET(req('purposes=reserve&basis=monthly'));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      const keys = body.points.map((p: { periodKey: string }) => p.periodKey);
+      expect(keys).toContain('monthly:2026-08');
+      expect(keys).not.toContain('monthly:2026-09');
+    });
   });
 });
